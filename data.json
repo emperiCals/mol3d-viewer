@@ -1,0 +1,18 @@
+{
+  "blockWidth": "60%",
+  "blockHeight": "400px",
+  "inlineWidth": "150px",
+  "inlineHeight": "120px",
+  "inlineAlign": "middle",
+  "borderWidth": "1px",
+  "borderColor": "#ffffff",
+  "backgroundColor": "#000000",
+  "isTransparent": true,
+  "styles": {
+    "xyz": "stick",
+    "pdb": "cartoon",
+    "sdf": "sphere",
+    "mol2": "stick",
+    "cif": "cartoon"
+  }
+}
