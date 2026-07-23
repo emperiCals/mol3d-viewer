@@ -1,0 +1,6 @@
+# CHANGELOG
+
+格式：`日期 | 类型 | 描述`
+说明：后续每次更改需在本文件追加一行记录。
+
+2026-07-23 | docs | 新增 API.md、AGENTS.md、CHANGELOG.log
