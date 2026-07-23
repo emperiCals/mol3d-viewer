@@ -4,3 +4,4 @@
 说明：后续每次更改需在本文件追加一行记录。
 
 2026-07-23 | docs | 新增 API.md、AGENTS.md、CHANGELOG.log
+2026-07-24 | docs | 新增共享 dev-env 浏览器调试环境说明（AGENTS.md）
