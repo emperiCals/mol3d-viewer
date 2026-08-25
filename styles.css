@@ -44,7 +44,7 @@
     vertical-align: var(--mol3d-inline-align);
     margin: 0 4px;
     border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
+    border-radius: var(--radius-s, 4px);
     background: transparent !important;
 }
 
@@ -62,12 +62,18 @@
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
+    /* 卡片化：JS 内联的 border/background/border-radius（来自用户设置）优先，此处仅作主题兜底 */
+    max-width: 100%; /* 宽度随阅读栏自适应，高度由设置/关键字固定 */
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m, 8px);
+    background-color: var(--background-secondary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 /* 标题栏样式：置于边框内部的一栏 */
 .mol3d-title-bar {
     padding: 6px 12px;
-    background: rgba(255, 255, 255, 0.05);
-    border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+    background: var(--background-secondary-alt, rgba(125, 125, 125, 0.06));
+    border-bottom: 1px solid var(--background-modifier-border);
     font-size: 0.9em;
     font-weight: bold;
     color: var(--text-normal);

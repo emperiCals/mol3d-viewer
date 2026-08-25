@@ -36,7 +36,7 @@ export class Mol3DView extends TextFileView {
     setViewData(data: string, clear: boolean): void {
         this.data = data;
         if (this.file) {
-            this.plugin.renderMolecule(this.moleculeEl, this.file.extension, data, "view");
+            this.plugin.renderMolecule(this.moleculeEl, this.file.extension, data, "view", this);
         }
         this.textPreviewEl.setText(data);
     }

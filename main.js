@@ -130,7 +130,7 @@ var Mol3DView = class extends import_obsidian2.TextFileView {
   setViewData(data, clear) {
     this.data = data;
     if (this.file) {
-      this.plugin.renderMolecule(this.moleculeEl, this.file.extension, data, "view");
+      this.plugin.renderMolecule(this.moleculeEl, this.file.extension, data, "view", this);
     }
     this.textPreviewEl.setText(data);
   }
@@ -221,7 +221,7 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
     return { keywords, finalContent };
   }
   // 核心渲染函数
-  async renderMolecule(parentContainer, format, rawContent, isEmbed = false) {
+  async renderMolecule(parentContainer, format, rawContent, isEmbed = false, child) {
     if (parentContainer.clientWidth === 0) {
       setTimeout(() => this.renderMolecule(parentContainer, format, rawContent, isEmbed), 200);
       return;
@@ -248,7 +248,7 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
       wrapper.style.width = "100%";
     } else {
       wrapper.style.border = `${finalBorderWidth} solid ${finalBorderColor}`;
-      wrapper.style.borderRadius = "8px";
+      wrapper.style.borderRadius = "var(--radius-m, 8px)";
       wrapper.style.height = finalHeight;
       wrapper.style.width = finalWidth;
       const isFullWidth = finalWidth.toString().trim() === "100%";
@@ -267,9 +267,7 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
       titleBar.setText(titleText);
     }
     const canvasArea = wrapper.createDiv({ cls: "mol3d-canvas-area" });
-    const viewer = window.$3Dmol.createViewer(canvasArea, {
-      backgroundColor: renderTransparent ? "none" : renderBg
-    });
+    const viewer = window.$3Dmol.createViewer(canvasArea, renderTransparent ? { backgroundColor: "#ffffff", backgroundAlpha: 0 } : { backgroundColor: renderBg });
     let userStyle = keywords.style || keywords.\u98CE\u683C || this.settings.styles[format.toLowerCase()] || "stick";
     let styleObj = {};
     if (userStyle === "cartoon") {
@@ -300,6 +298,9 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
       }
     });
     ro.observe(wrapper);
+    if (child) {
+      child.register(() => ro.disconnect());
+    }
     return viewer;
   }
   initProcessors() {
@@ -323,7 +324,7 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
                     }
                   }
                 }
-                await plugin.renderMolecule(div, finalFmt, modelData, true);
+                await plugin.renderMolecule(div, finalFmt, modelData, true, this);
               };
               await updateRender();
               this.registerEvent(plugin.app.workspace.on("mol3d:update", () => updateRender()));
@@ -351,7 +352,7 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
                 const file = plugin.app.metadataCache.getFirstLinkpathDest(src, ctx.sourcePath || "");
                 if (file) {
                   const data = await plugin.app.vault.read(file);
-                  await plugin.renderMolecule(node, extension, data, true);
+                  await plugin.renderMolecule(node, extension, data, true, this);
                 } else if (retryCount < 10) {
                   setTimeout(() => updateRender(retryCount + 1), 300);
                 }
@@ -390,7 +391,7 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
                       finalFmt = file.extension;
                     }
                   }
-                  await plugin.renderMolecule(span, finalFmt, modelData, false);
+                  await plugin.renderMolecule(span, finalFmt, modelData, false, this);
                 };
                 await updateRender();
                 this.registerEvent(plugin.app.workspace.on("mol3d:update", () => updateRender()));

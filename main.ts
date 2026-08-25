@@ -1,4 +1,4 @@
-import { Plugin, MarkdownRenderChild, TFile, normalizePath, MarkdownPostProcessorContext } from "obsidian";
+import { Plugin, MarkdownRenderChild, TFile, normalizePath, MarkdownPostProcessorContext, Component } from "obsidian";
 import { DEFAULT_SETTINGS, Mol3DPluginSettings, Mol3DMobileSettingTab } from "./settings";
 import { Mol3DView, VIEW_TYPE_MOL3D } from "./view";
 
@@ -98,7 +98,7 @@ export default class Mol3DViewerMobile extends Plugin {
     }
 
     // 核心渲染函数
-    async renderMolecule(parentContainer: HTMLElement, format: string, rawContent: string, isEmbed: boolean | string = false): Promise<any> {
+    async renderMolecule(parentContainer: HTMLElement, format: string, rawContent: string, isEmbed: boolean | string = false, child?: Component): Promise<any> {
         if (parentContainer.clientWidth === 0) {
             setTimeout(() => this.renderMolecule(parentContainer, format, rawContent, isEmbed), 200);
             return;
@@ -137,7 +137,7 @@ export default class Mol3DViewerMobile extends Plugin {
             wrapper.style.width = "100%";
         } else {
             wrapper.style.border = `${finalBorderWidth} solid ${finalBorderColor}`;
-            wrapper.style.borderRadius = "8px";
+            wrapper.style.borderRadius = "var(--radius-m, 8px)";
             wrapper.style.height = finalHeight;
             wrapper.style.width = finalWidth;
             const isFullWidth = finalWidth.toString().trim() === "100%";
@@ -163,9 +163,10 @@ export default class Mol3DViewerMobile extends Plugin {
         // 插入画布容器
         const canvasArea = wrapper.createDiv({ cls: "mol3d-canvas-area" });
 
-        const viewer = window.$3Dmol.createViewer(canvasArea, {
-            backgroundColor: renderTransparent ? 'none' : renderBg
-        }); 
+        // 3Dmol 不认 'none'/'transparent' 这类 CSS 颜色关键字，透明背景要用 backgroundAlpha: 0
+        const viewer = window.$3Dmol.createViewer(canvasArea, renderTransparent
+            ? { backgroundColor: "#ffffff", backgroundAlpha: 0 }
+            : { backgroundColor: renderBg });
         
         // 渲染风格
         let userStyle = keywords.style || keywords.风格 || this.settings.styles[format.toLowerCase()] || "stick";
@@ -203,6 +204,9 @@ export default class Mol3DViewerMobile extends Plugin {
             }
         });
         ro.observe(wrapper);
+        if (child) {
+            child.register(() => ro.disconnect());
+        }
         return viewer;
     }
 
@@ -228,7 +232,7 @@ export default class Mol3DViewerMobile extends Plugin {
                                         }
                                     }
                                 }
-                                await plugin.renderMolecule(div, finalFmt, modelData, true);
+                                await plugin.renderMolecule(div, finalFmt, modelData, true, this);
                             };
                             await updateRender();
                             this.registerEvent(plugin.app.workspace.on("mol3d:update", () => updateRender()));
@@ -257,7 +261,7 @@ export default class Mol3DViewerMobile extends Plugin {
                                 const file = plugin.app.metadataCache.getFirstLinkpathDest(src, ctx.sourcePath || "");
                                 if (file) {
                                     const data = await plugin.app.vault.read(file);
-                                    await plugin.renderMolecule(node as HTMLElement, extension, data, true);
+                                    await plugin.renderMolecule(node as HTMLElement, extension, data, true, this);
                                 } else if (retryCount < 10) {
                                     setTimeout(() => updateRender(retryCount + 1), 300);
                                 }
@@ -293,7 +297,7 @@ export default class Mol3DViewerMobile extends Plugin {
                                         const file = plugin.app.metadataCache.getFirstLinkpathDest(modelData.substring(2, modelData.length-2), ctx.sourcePath || "");
                                         if (file) { modelData = await plugin.app.vault.read(file); finalFmt = file.extension; }
                                     }
-                                    await plugin.renderMolecule(span, finalFmt, modelData, false);
+                                    await plugin.renderMolecule(span, finalFmt, modelData, false, this);
                                 };
                                 await updateRender();
                                 this.registerEvent(plugin.app.workspace.on("mol3d:update", () => updateRender()));
