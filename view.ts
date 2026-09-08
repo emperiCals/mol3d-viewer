@@ -1,5 +1,6 @@
 import { TextFileView, WorkspaceLeaf } from "obsidian";
 import type Mol3DViewerMobile from "./main";
+import { t } from "./i18n";
 
 export const VIEW_TYPE_MOL3D = "mol3d-view";
 
@@ -19,7 +20,7 @@ export class Mol3DView extends TextFileView {
     }
 
     getDisplayText(): string { 
-        return this.file ? this.file.name : "Mol3D Viewer"; 
+        return this.file ? this.file.name : t("views.displayName"); 
     }
 
     getIcon(): string { 

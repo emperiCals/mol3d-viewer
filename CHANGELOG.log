@@ -8,3 +8,4 @@
 2026-07-24 | docs | 记录新增 dev-env 测试体系（vitest 单测 + 浏览器渲染测试），AGENTS.md 补充 npm test / test:browser 用法
 2026-08-25 | style | 卡片化容器（圆角/阴影/主题变量边框背景兜底）+ 宽度自适应 max-width:100%，标题栏硬编码色改主题变量，ResizeObserver 通过 child.register 卸载防泄漏
 2026-08-25 | fix | 透明背景改用 backgroundAlpha:0，不再向 3Dmol 传非法颜色 'none'（消除 color not found 警告）
+2026-09-08 | feat | i18n 中英双语支持（i18next，随 Obsidian 界面语言切换，文案抽取至 i18n/locales/）

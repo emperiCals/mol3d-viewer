@@ -1,0 +1,23 @@
+{
+    "settings": {
+        "sizeTitle": "Size & Alignment",
+        "blockWidth": "Block width",
+        "blockHeight": "Block height",
+        "borderTitle": "Border Style",
+        "borderWidth": "Border width",
+        "borderColor": "Border color",
+        "backgroundTitle": "Molecule Background",
+        "transparent": "Enable transparent background",
+        "transparentDesc": "When enabled, the background color setting is ignored",
+        "backgroundColor": "Background color",
+        "styleTitle": "Default Style per Format",
+        "styleCartoon": "Cartoon (spectrum)"
+    },
+    "views": {
+        "displayName": "Mol3D Viewer"
+    },
+    "errors": {
+        "libNotLoaded": "3Dmol.js library not loaded. Make sure 3Dmol-min.js exists in the plugin folder",
+        "parseFailed": "Failed to parse model"
+    }
+}

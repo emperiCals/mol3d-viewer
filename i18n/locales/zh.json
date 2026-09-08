@@ -1,0 +1,23 @@
+{
+    "settings": {
+        "sizeTitle": "尺寸与对齐设置",
+        "blockWidth": "块宽度",
+        "blockHeight": "块高度",
+        "borderTitle": "边框样式设置",
+        "borderWidth": "边框宽度",
+        "borderColor": "边框颜色",
+        "backgroundTitle": "分子背景设置",
+        "transparent": "启用透明背景",
+        "transparentDesc": "开启后将忽略背景颜色设置",
+        "backgroundColor": "背景颜色",
+        "styleTitle": "格式默认风格",
+        "styleCartoon": "Cartoon (光谱色)"
+    },
+    "views": {
+        "displayName": "Mol3D Viewer"
+    },
+    "errors": {
+        "libNotLoaded": "3Dmol.js 库未加载，请确保插件目录下确实存在 3Dmol-min.js 文件",
+        "parseFailed": "模型解析失败"
+    }
+}

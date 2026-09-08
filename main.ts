@@ -1,6 +1,7 @@
 import { Plugin, MarkdownRenderChild, TFile, normalizePath, MarkdownPostProcessorContext, Component } from "obsidian";
 import { DEFAULT_SETTINGS, Mol3DPluginSettings, Mol3DMobileSettingTab } from "./settings";
 import { Mol3DView, VIEW_TYPE_MOL3D } from "./view";
+import { initI18n, t } from "./i18n";
 
 declare global {
     interface Window {
@@ -12,6 +13,7 @@ export default class Mol3DViewerMobile extends Plugin {
     settings: Mol3DPluginSettings;
 
     async onload() {
+        await initI18n();
         await this.loadSettings();
         this.addSettingTab(new Mol3DMobileSettingTab(this.app, this));
 
@@ -107,7 +109,7 @@ export default class Mol3DViewerMobile extends Plugin {
         parentContainer.empty();
         
         if (!window.$3Dmol) {
-            parentContainer.setText("3Dmol.js 库未加载，请确保插件目录下确实存在 3Dmol-min.js 文件");
+            parentContainer.setText(t("errors.libNotLoaded"));
             return;
         }
 
@@ -194,7 +196,7 @@ export default class Mol3DViewerMobile extends Plugin {
             
             viewer.render();
         } catch (err) {
-            canvasArea.setText("模型解析失败");
+            canvasArea.setText(t("errors.parseFailed"));
         }
 
         const ro = new ResizeObserver(() => {

@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type Mol3DViewerMobile from "./main";
+import { t } from "./i18n";
 
 export interface Mol3DPluginSettings {
     blockWidth: string;
@@ -39,9 +40,9 @@ export class Mol3DMobileSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
         
-        containerEl.createEl("h2", { text: "尺寸与对齐设置" });
+        containerEl.createEl("h2", { text: t("settings.sizeTitle") });
         new Setting(containerEl)
-            .setName("块宽度")
+            .setName(t("settings.blockWidth"))
             .addText(t => t
                 .setValue(this.plugin.settings.blockWidth)
                 .onChange(async v => { 
@@ -51,7 +52,7 @@ export class Mol3DMobileSettingTab extends PluginSettingTab {
             );
 
         new Setting(containerEl)
-            .setName("块高度")
+            .setName(t("settings.blockHeight"))
             .addText(t => t
                 .setValue(this.plugin.settings.blockHeight)
                 .onChange(async v => { 
@@ -60,9 +61,9 @@ export class Mol3DMobileSettingTab extends PluginSettingTab {
                 })
             );
 
-        containerEl.createEl("h2", { text: "边框样式设置" });
+        containerEl.createEl("h2", { text: t("settings.borderTitle") });
         new Setting(containerEl)
-            .setName("边框宽度")
+            .setName(t("settings.borderWidth"))
             .addText(t => t
                 .setValue(this.plugin.settings.borderWidth)
                 .onChange(async v => { 
@@ -72,7 +73,7 @@ export class Mol3DMobileSettingTab extends PluginSettingTab {
             );
 
         new Setting(containerEl)
-            .setName("边框颜色")
+            .setName(t("settings.borderColor"))
             .addColorPicker(cp => cp
                 .setValue(this.plugin.settings.borderColor.startsWith('var') ? '#cccccc' : this.plugin.settings.borderColor)
                 .onChange(async v => { 
@@ -81,10 +82,10 @@ export class Mol3DMobileSettingTab extends PluginSettingTab {
                 })
             );
 
-        containerEl.createEl("h2", { text: "分子背景设置" });
+        containerEl.createEl("h2", { text: t("settings.backgroundTitle") });
         new Setting(containerEl)
-            .setName("启用透明背景")
-            .setDesc("开启后将忽略背景颜色设置")
+            .setName(t("settings.transparent"))
+            .setDesc(t("settings.transparentDesc"))
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.isTransparent)
                 .onChange(async v => {
@@ -96,7 +97,7 @@ export class Mol3DMobileSettingTab extends PluginSettingTab {
 
         if (!this.plugin.settings.isTransparent) {
             new Setting(containerEl)
-                .setName("背景颜色")
+                .setName(t("settings.backgroundColor"))
                 .addColorPicker(cp => cp
                     .setValue(this.plugin.settings.backgroundColor)
                     .onChange(async v => {
@@ -106,8 +107,8 @@ export class Mol3DMobileSettingTab extends PluginSettingTab {
                 );
         }
 
-        containerEl.createEl("h2", { text: "格式默认风格" });
-        const styleOptions: Record<string, string> = { "stick": "Stick", "sphere": "Sphere", "line": "Line", "cartoon": "Cartoon (光谱色)" };
+        containerEl.createEl("h2", { text: t("settings.styleTitle") });
+        const styleOptions: Record<string, string> = { "stick": "Stick", "sphere": "Sphere", "line": "Line", "cartoon": t("settings.styleCartoon") };
         Object.keys(this.plugin.settings.styles).forEach(fmt => {
             new Setting(containerEl)
                 .setName(fmt.toUpperCase())
