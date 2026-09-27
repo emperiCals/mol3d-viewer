@@ -66,9 +66,13 @@ export class Mol3DView extends TextFileView {
         if (this.file && !isTopology) {
             const file = this.file;
             // 二进制格式（bcif/轨迹等）TextFileView 读出的文本无效，统一走插件按格式读取
-            this.plugin.readMolFile(file).then(d =>
-                this.plugin.renderMolecule(this.moleculeEl, file.extension, d, "view", this, file.path)
-            );
+            // 移动端（iPad/WKWebView）曾出现静默崩溃：显式 catch 并把错误显示在视图中
+            this.plugin.readMolFile(file)
+                .then(d => this.plugin.renderMolecule(this.moleculeEl, file.extension, d, "view", this, file.path))
+                .catch(e => {
+                    console.error("[Mol3D] 文件加载失败", e);
+                    this.moleculeEl.setText(t("errors.parseFailed") + ": " + (e?.message || e));
+                });
         }
     }
 
