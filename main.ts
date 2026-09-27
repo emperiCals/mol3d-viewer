@@ -2,23 +2,37 @@ import { Plugin, MarkdownRenderChild, TFile, normalizePath, MarkdownPostProcesso
 import { DEFAULT_SETTINGS, Mol3DPluginSettings, Mol3DMobileSettingTab } from "./settings";
 import { Mol3DView, VIEW_TYPE_MOL3D } from "./view";
 import { initI18n, t } from "./i18n";
+import { FORMAT_REGISTRY, TOPOLOGY_FORMATS } from "./formats";
 
 declare global {
     interface Window {
-        $3Dmol: any;
+        molstar: any;
     }
 }
 
 export default class Mol3DViewerMobile extends Plugin {
     settings: Mol3DPluginSettings;
+    // 记录每个容器上的 Mol* viewer，重渲染/卸载时 dispose，防止 WebGL 上下文泄漏
+    private viewers = new WeakMap<HTMLElement, any>();
 
     async onload() {
         await initI18n();
         await this.loadSettings();
         this.addSettingTab(new Mol3DMobileSettingTab(this.app, this));
 
+        // 全局抑制 Mol* 上游 "empty textures" 未捕获拒绝（SSAO 0 尺寸边界 bug），
+        // 同时作为版本探针：若控制台仍出现该错误且没有本条 warn，说明运行的不是本版本代码
+        const rejHandler = (e: PromiseRejectionEvent) => {
+            if (e.reason && e.reason.message === "empty textures are not allowed") {
+                console.warn("[Mol3D] 已抑制上游 empty textures 异常（0 尺寸 resize，无害）");
+                e.preventDefault();
+            }
+        };
+        window.addEventListener("unhandledrejection", rejHandler);
+        this.register(() => window.removeEventListener("unhandledrejection", rejHandler));
+
         try {
-            await this.injectDependency("3Dmol-min.js", "$3Dmol");
+            await this.injectDependency("molstar.js", "molstar");
             
             try {
                 this.registerView(
@@ -39,8 +53,7 @@ export default class Mol3DViewerMobile extends Plugin {
             });
 
             this.initProcessors();
-            this.applySettings();
-            
+
             console.log("Mol3D Viewer: 已开启文件关联与增强嵌入渲染");
         } catch (e) {
             console.error("Mol3D Viewer 加载失败", e);
@@ -48,13 +61,30 @@ export default class Mol3DViewerMobile extends Plugin {
     }
 
     async injectDependency(fileName: string, globalVar: string): Promise<any> {
+        if (window[globalVar as keyof Window]) return window[globalVar as keyof Window];
+
+        // Obsidian CSP 拦截 <link> 外链样式（style-src 仅 unsafe-inline/self），
+        // 因此 CSS 一律读文本后以内联 <style> 注入
+        const injectCssText = (css: string) => {
+            const style = document.createElement("style");
+            style.setAttribute("data-mol3d", "molstar");
+            style.textContent = css;
+            document.head.appendChild(style);
+        };
+        const injectLocalCss = async () => {
+            try {
+                const css = await (this.app.vault.adapter as any).read(normalizePath(this.manifest.dir + "/molstar.css"));
+                injectCssText(css);
+            } catch (e) { /* css 缺失时仅靠 styles.css 兜底 */ }
+        };
+
         return new Promise((resolve) => {
-            if (window[globalVar as keyof Window]) return resolve(window[globalVar as keyof Window]);
-            
             const loadCDN = () => {
-                console.log(`[Mol3D] 尝试从 CDN 回退加载 3Dmol-min.js ...`);
+                console.log(`[Mol3D] 尝试从 CDN 回退加载 molstar.js ...`);
+                fetch("https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.css")
+                    .then(r => r.text()).then(injectCssText).catch(() => { /* 忽略 */ });
                 const script = document.createElement("script");
-                script.src = "https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.0/3Dmol-min.js";
+                script.src = "https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.js";
                 script.type = "text/javascript";
                 script.onload = () => resolve(window[globalVar as keyof Window]);
                 script.onerror = () => resolve(null);
@@ -62,6 +92,7 @@ export default class Mol3DViewerMobile extends Plugin {
             };
 
             try {
+                injectLocalCss();
                 const adapter = this.app.vault.adapter as any;
                 const resourcePath = adapter.getResourcePath(normalizePath(this.manifest.dir + "/" + fileName));
                 const script = document.createElement("script");
@@ -74,6 +105,13 @@ export default class Mol3DViewerMobile extends Plugin {
                 loadCDN();
             }
         });
+    }
+
+    // 按格式读取分子文件：二进制格式（bcif/dcd/xtc/体积图等）走 readBinary
+    async readMolFile(file: TFile): Promise<string | Uint8Array> {
+        const info = FORMAT_REGISTRY[file.extension.toLowerCase()];
+        if (info?.binary) return new Uint8Array(await this.app.vault.readBinary(file));
+        return this.app.vault.read(file);
     }
 
     // 解析关键词功能：支持 Key:Value, Key=Value 以及中英文
@@ -99,24 +137,43 @@ export default class Mol3DViewerMobile extends Plugin {
         return { keywords, finalContent };
     }
 
-    // 核心渲染函数
-    async renderMolecule(parentContainer: HTMLElement, format: string, rawContent: string, isEmbed: boolean | string = false, child?: Component): Promise<any> {
+    // 核心渲染函数（filePath：体积图按 URL 加载所需；sourcePath：轨迹 topology 链接解析基准）
+    async renderMolecule(parentContainer: HTMLElement, format: string, rawContent: string | Uint8Array, isEmbed: boolean | string = false, child?: Component, filePath?: string, sourcePath?: string): Promise<any> {
         if (parentContainer.clientWidth === 0) {
-            setTimeout(() => this.renderMolecule(parentContainer, format, rawContent, isEmbed), 200);
+            setTimeout(() => this.renderMolecule(parentContainer, format, rawContent, isEmbed, child, filePath, sourcePath), 200);
             return;
         }
-        
+
         parentContainer.empty();
-        
-        if (!window.$3Dmol) {
+        this.disposeViewer(parentContainer);
+
+        if (!window.molstar) {
             parentContainer.setText(t("errors.libNotLoaded"));
             return;
         }
 
-        // 解析关键词和真正的数据
-        const { keywords, finalContent } = this.parseKeywords(rawContent);
+        // 解析关键词和真正的数据（二进制内容跳过关键词段解析）
+        const parsed = typeof rawContent === "string"
+            ? this.parseKeywords(rawContent)
+            : { keywords: {} as Record<string, any>, finalContent: rawContent };
+        const keywords = parsed.keywords;
+        let finalContent = parsed.finalContent;
+
+        // 关键词段之后的 [[wikilink]] 统一在此解析（代码块带关键词 + 文件引用的场景）
+        let effExt = format.toLowerCase();
+        let effPath = filePath;
+        if (typeof finalContent === "string" && /^\[\[.+\]\]$/.test(finalContent.trim())) {
+            const ref = finalContent.trim().slice(2, -2);
+            const f = this.app.metadataCache.getFirstLinkpathDest(ref, sourcePath || "");
+            if (f instanceof TFile) {
+                finalContent = await this.readMolFile(f);
+                effExt = f.extension.toLowerCase();
+                effPath = f.path;
+            }
+        }
 
         const wrapper = parentContainer.createDiv({ cls: "mol3d-wrapper" });
+        if (FORMAT_REGISTRY[effExt]?.category === "trajectory") wrapper.addClass("mol3d-trajectory");
         
         // 移动端适配逻辑
         const isMobileScreen = window.innerWidth <= 600;
@@ -133,6 +190,7 @@ export default class Mol3DViewerMobile extends Plugin {
 
         // 样式区分
         if (isEmbed === "view") {
+            wrapper.addClass("mol3d-view-full");
             wrapper.style.border = "none";
             wrapper.style.borderRadius = "0";
             wrapper.style.height = "100%";
@@ -165,44 +223,203 @@ export default class Mol3DViewerMobile extends Plugin {
         // 插入画布容器
         const canvasArea = wrapper.createDiv({ cls: "mol3d-canvas-area" });
 
-        // 3Dmol 不认 'none'/'transparent' 这类 CSS 颜色关键字，透明背景要用 backgroundAlpha: 0
-        const viewer = window.$3Dmol.createViewer(canvasArea, renderTransparent
-            ? { backgroundColor: "#ffffff", backgroundAlpha: 0 }
-            : { backgroundColor: renderBg });
-        
-        // 渲染风格
-        let userStyle = keywords.style || keywords.风格 || this.settings.styles[format.toLowerCase()] || "stick";
-        let styleObj: Record<string, any> = {};
-        if (userStyle === "cartoon") {
-            styleObj = { cartoon: { color: 'spectrum' } };
-        } else {
-            styleObj[userStyle] = {};
+        // Mol* 创建时要求容器尺寸非 0（后台页签 display:none 或布局未完成会报 "empty textures"），
+        // 用 ResizeObserver 挂起，直到容器真正可见才创建 viewer
+        if (canvasArea.clientWidth === 0 || canvasArea.clientHeight === 0) {
+            await new Promise<void>(resolve => {
+                const sro = new ResizeObserver(() => {
+                    if (canvasArea.clientWidth > 0 && canvasArea.clientHeight > 0) { sro.disconnect(); resolve(); }
+                });
+                sro.observe(canvasArea);
+            });
         }
 
+        let viewer: any;
         try {
-            viewer.addModel(finalContent, format.toLowerCase());
-            viewer.setStyle({}, styleObj);
-            viewer.zoomTo();
-
-            const bgColorHex = renderBg.startsWith('#') ? renderBg.replace('#', '0x') : renderBg;
-            const opacity = renderTransparent ? 0 : 1;
-            
-            try {
-                const colorVal = parseInt(bgColorHex.startsWith('0x') ? bgColorHex : (bgColorHex.startsWith('#') ? bgColorHex.replace('#', '0x') : '0x000000'));
-                viewer.setBackgroundColor(isNaN(colorVal) ? 0x000000 : colorVal, opacity); 
-            } catch(e) {
-                viewer.setBackgroundColor(0x000000, opacity);
+            const isTrajectory = FORMAT_REGISTRY[effExt]?.category === "trajectory";
+            const perfOpts = {
+                pixelScale: this.settings.pixelScale,
+                resolutionMode: this.settings.resolutionMode as "auto" | "scaled" | "native",
+            };
+            // 全文件视图使用完整 Mol* 界面；卡片/嵌入保持精简
+            const viewerOptions = isEmbed === "view" ? {
+                viewportBackgroundColor: renderTransparent ? undefined : renderBg,
+                layoutShowRemoteState: false, // 远程状态面板会联网拉取 webchem.ncbr.muni.cz，离线报错
+                disabledExtensions: ["g3d"], // 避免多实例重复注册 g3d symbol 刷警告
+                ...perfOpts,
+            } : {
+                layoutIsExpanded: false,
+                layoutShowControls: false,
+                layoutShowSequence: false,
+                layoutShowLog: false,
+                layoutShowLeftPanel: false,
+                viewportShowExpand: false,
+                viewportShowControls: false,
+                viewportShowSettings: false,
+                viewportShowScreenshotControls: false,
+                viewportShowSelectionMode: false,
+                // 轨迹格式需要播放/帧控制条
+                viewportShowAnimation: isTrajectory,
+                viewportShowTrajectoryControls: isTrajectory,
+                viewportBackgroundColor: renderTransparent ? undefined : renderBg,
+                disabledExtensions: ["g3d"],
+                ...perfOpts,
+            };
+            viewer = await window.molstar.Viewer.create(canvasArea, viewerOptions);
+            this.viewers.set(parentContainer, viewer);
+            if (child) {
+                child.register(() => this.disposeViewer(parentContainer));
             }
-            
-            viewer.render();
+
+            // 终极兜底：钳制 getDrawingBufferSize 最小 8x8。
+            // Mol* passes.updateSize 只钳到 2x2，SSAO 在高分屏（1/pixelRatio ≤ 0.5）
+            // 下 floor(2*0.33)=0 仍会抛 empty textures；画布 0x0 可能经挂载竞态等路径漏入。
+            // 必须最先执行且独立 try：后续补丁若抛异常不能影响本补丁生效
+            try {
+                const webgl = viewer.plugin.canvas3d?.webgl;
+                if (webgl && !webgl.__mol3dSizeClamped) {
+                    const origGetSize = webgl.getDrawingBufferSize.bind(webgl);
+                    webgl.getDrawingBufferSize = () => {
+                        const s = origGetSize();
+                        if (s.width >= 8 && s.height >= 8) return s;
+                        return { width: Math.max(s.width, 8), height: Math.max(s.height, 8) };
+                    };
+                    webgl.__mol3dSizeClamped = true;
+                    console.debug("[Mol3D] drawing buffer size clamp applied");
+                } else if (!webgl) {
+                    console.warn("[Mol3D] canvas3d.webgl 不可用，尺寸钳制未生效");
+                }
+            } catch (e) { /* 钳制失败不阻断渲染 */ }
+
+            // 直接吞掉 passes.updateSize 的异常：SSAO 0 尺寸纹理是 Mol* 上游边界 bug，
+            // 错过一帧 resize 无害，但 uncaught 错误会污染控制台
+            try {
+                const passes = viewer.plugin.canvas3dContext?.passes;
+                if (passes && !passes.__mol3dGuarded) {
+                    const origUpdateSize = passes.updateSize.bind(passes);
+                    passes.updateSize = () => {
+                        try { origUpdateSize(); } catch (e) {
+                            console.debug("[Mol3D] updateSize 异常已吞掉（容器尺寸为 0 时的上游 bug）", e);
+                        }
+                    };
+                    passes.__mol3dGuarded = true;
+                }
+            } catch (e) { /* 防御失败不阻断渲染 */ }
+
+            // 背景与透明度必须在 loadStructureFromData 之前设置，
+            // 否则加载期间以 Mol* 默认白色背景渲染，造成打开时闪白
+            // （Mol* 的 Color 为 0xRRGGBB 数字；transparentBackground 是 canvas3d 顶层参数）
+            try {
+                const hex = renderBg.trim().replace(/^#/, "");
+                const colorNum = /^[0-9a-fA-F]{6}$/.test(hex) ? parseInt(hex, 16) : 0x000000;
+                const c3d = viewer.plugin.canvas3d;
+                const s = this.settings;
+                c3d?.setProps({
+                    transparentBackground: renderTransparent,
+                    checkeredTransparentBackground: false, // 透明时透出笔记底色，而非棋盘格
+                    renderer: { backgroundColor: colorNum },
+                    // 渲染效果开关（参数为 Mol* 官方默认值；off 状态 params 为 {}，沿用会缺字段崩 shader）
+                    postprocessing: {
+                        occlusion: { name: s.occlusion ? "on" : "off", params: { samples: 32, multiScale: { name: "off", params: {} }, radius: 5, bias: 0.8, blurKernelSize: 15, blurDepthBias: 0.5, resolutionScale: 1, color: 0, transparentThreshold: 0.4 } },
+                        shadow: { name: s.shadow ? "on" : "off", params: { steps: 1, maxDistance: 3, tolerance: 1 } },
+                        outline: { name: s.outline ? "on" : "off", params: { scale: 1, threshold: 0.33, color: 0, includeTransparent: true } },
+                        dof: { name: s.dof ? "on" : "off", params: { blurSize: 9, blurSpread: 1, inFocus: 0, PPM: 20, center: "camera-target", mode: "plane" } },
+                    },
+                    cameraFog: { name: s.fog ? "on" : "off", params: { intensity: 15 } },
+                    transparency: s.transparencyMode,
+                });
+            } catch (e) { /* 颜色解析失败时保持默认背景 */ }
+
+            // 辅助防御：包装 context.handleResize，容器尺寸为 0 时拒绝执行，
+            // 防止 Mol* 内部把 canvas 写成 0x0
+            try {
+                const origCtxResize = viewer.plugin.handleResize?.bind(viewer.plugin);
+                if (origCtxResize) {
+                    viewer.plugin.handleResize = () => {
+                        if (canvasArea.clientWidth > 0 && canvasArea.clientHeight > 0) origCtxResize();
+                    };
+                    // 挂载瞬间若已拿到 0 尺寸，这里趁容器可见立即修正
+                    if (canvasArea.clientWidth > 0 && canvasArea.clientHeight > 0) origCtxResize();
+                }
+            } catch (e) { /* 包装失败不阻断渲染 */ }
+        } catch (e) {
+            canvasArea.setText(t("errors.libNotLoaded"));
+            return;
+        }
+
+        // 渲染风格（Mol* 原生表示名，兼容旧版 3Dmol 风格名）
+        const legacyStyle: Record<string, string> = { stick: "ball-and-stick", sphere: "spacefill" };
+        let userStyle = keywords.style || keywords.风格 || this.settings.styles[effExt] || "ball-and-stick";
+        userStyle = legacyStyle[userStyle] || userStyle;
+
+        const info = FORMAT_REGISTRY[effExt];
+
+        try {
+            if (info?.category === "topology") {
+                canvasArea.setText(t("errors.topologyNeedsTrajectory"));
+            } else if (info?.category === "trajectory") {
+                // 轨迹：topology/model 关键词指定拓扑或结构文件（wikilink 或路径）；
+                // 缺省时按同目录同名文件自动配对（psf/prmtop/parm7/top/pdb/gro）
+                const topoRef = keywords.topology || keywords.拓扑 || keywords.model || keywords.结构;
+                let topoFile: TFile | null = null;
+                if (topoRef) {
+                    const ref = String(topoRef).replace(/^\[\[|\]\]$/g, "");
+                    topoFile = this.app.metadataCache.getFirstLinkpathDest(ref, sourcePath || "");
+                } else if (filePath) {
+                    const base = filePath.replace(/\.[^.]+$/, "");
+                    for (const e of ["psf", "prmtop", "parm7", "top", "pdb", "gro"]) {
+                        const f = this.app.vault.getAbstractFileByPath(`${base}.${e}`);
+                        if (f instanceof TFile) { topoFile = f; break; }
+                    }
+                }
+                if (!(topoFile instanceof TFile)) {
+                    canvasArea.setText(t("errors.trajectoryNeedsTopology"));
+                } else {
+                    const topoExt = topoFile.extension.toLowerCase();
+                    const topoData = await this.readMolFile(topoFile);
+                    const model = TOPOLOGY_FORMATS[topoExt]
+                        ? { kind: "topology-data", data: topoData, format: TOPOLOGY_FORMATS[topoExt] }
+                        : { kind: "model-data", data: topoData, format: FORMAT_REGISTRY[topoExt]?.mol || topoExt };
+                    await viewer.loadTrajectory({
+                        model,
+                        coordinates: { kind: "coordinates-data", data: finalContent, format: info.mol },
+                    });
+                    await this.applyRepresentation(viewer, userStyle);
+                    // loadTrajectory 不一定自动对焦，手动重置相机
+                    try { viewer.plugin.canvas3d?.requestCameraReset?.(); } catch (e) { /* noop */ }
+                }
+            } else {
+                let molFormat = info?.mol || effExt;
+                const isCoreCif = molFormat === "mmcif" && typeof finalContent === "string" &&
+                    /_atom_site_fract_/.test(finalContent) && !/_atom_site\.label_atom_id/.test(finalContent);
+                if (isCoreCif) {
+                    // 晶体学 core CIF（CIF1 方言，仅分数坐标）：mmcif 解析为空模型，
+                    // 手动走 cifCore 解析 + 对称性展开 preset（默认完整晶胞；cell 关键词可选 supercell/contacts）
+                    const cellMode = (keywords.cell || keywords.晶胞 || "unit").toString().toLowerCase();
+                    const presetId = cellMode === "supercell" ? "preset-trajectory-supercell"
+                        : cellMode === "contacts" ? "preset-trajectory-crystal-contacts"
+                        : "preset-trajectory-unitcell";
+                    const data = await viewer.plugin.builders.data.rawData({ data: finalContent });
+                    const trajectory = await viewer.plugin.builders.structure.parseTrajectory(data, "cifCore");
+                    await viewer.plugin.builders.structure.hierarchy.applyPreset(trajectory, presetId);
+                } else {
+                    await viewer.loadStructureFromData(finalContent, molFormat);
+                }
+                await this.applyRepresentation(viewer, userStyle);
+            }
         } catch (err) {
             canvasArea.setText(t("errors.parseFailed"));
         }
 
+        // 容器归零（页签切后台 display:none）时暂停渲染循环：
+        // Mol* passes.updateSize 钳到 2x2 后 SSAO 在高分屏下降采样为 0，会抛 empty textures
         const ro = new ResizeObserver(() => {
-            if (wrapper.clientWidth > 0) { 
-                viewer.resize(); 
-                viewer.render(); 
+            const c3d = viewer.plugin?.canvas3d;
+            if (wrapper.clientWidth > 0 && wrapper.clientHeight > 0) {
+                c3d?.resume();
+                viewer.handleResize();
+            } else {
+                c3d?.pause();
             }
         });
         ro.observe(wrapper);
@@ -210,6 +427,43 @@ export default class Mol3DViewerMobile extends Plugin {
             child.register(() => ro.disconnect());
         }
         return viewer;
+    }
+
+    private disposeViewer(container: HTMLElement) {
+        const v = this.viewers.get(container);
+        if (v) {
+            try { v.dispose(); } catch (e) { /* 忽略重复 dispose */ }
+            this.viewers.delete(container);
+        }
+    }
+
+    // 按 Mol* 原生表示名重建结构表示，统一使用二级结构着色
+    async applyRepresentation(viewer: any, style: string): Promise<void> {
+        const mgr = viewer.plugin?.managers?.structure;
+        if (!mgr) return;
+        const structures = mgr.hierarchy.current.structures;
+        for (const s of structures) {
+            const comps = s.components;
+            if (!comps || comps.length === 0) continue;
+            try {
+                await mgr.component.removeRepresentations(comps);
+                await mgr.component.addRepresentation(comps, style);
+                // 重建后重新读取层级，旧的组件快照里 representation 引用已失效
+                const fresh = mgr.hierarchy.current.structures;
+                for (const fs of fresh) {
+                    if (fs.components?.length) {
+                        // cartoon 用二级结构着色，其余（小分子/配体球棍等）用元素着色
+                        await mgr.component.updateRepresentationsTheme?.(fs.components, (_c: any, repr: any) => ({
+                            color: repr.cell?.transform?.params?.type?.name === "cartoon" ? "secondary-structure" : "element-symbol"
+                        }));
+                    }
+                }
+                // 晶胞框不在这里处理：core CIF 由 unitcell preset 自带可见晶胞，
+                // 蛋白等 mmcif/pdb 的晶胞保持默认隐藏
+            } catch (e) {
+                console.warn(`[Mol3D] 无法应用表示风格 ${style}`, e);
+            }
+        }
     }
 
     initProcessors() {
@@ -223,18 +477,19 @@ export default class Mol3DViewerMobile extends Plugin {
                     const child = new (class extends MarkdownRenderChild {
                         async onload() {
                             const updateRender = async () => {
-                                let modelData = source.trim(), finalFmt = fmt;
-                                if (modelData.includes("[[") && modelData.includes("]]") && !modelData.includes("---")) {
+                                let modelData: string | Uint8Array = source.trim(), finalFmt = fmt, filePath: string | undefined;
+                                if (typeof modelData === "string" && modelData.includes("[[") && modelData.includes("]]") && !modelData.includes("---")) {
                                     const match = modelData.match(/\[\[(.*?)\]\]/);
                                     if (match) {
                                         const file = plugin.app.metadataCache.getFirstLinkpathDest(match[1], ctx.sourcePath || "");
-                                        if (file instanceof TFile) { 
-                                            modelData = await plugin.app.vault.read(file); 
-                                            finalFmt = file.extension; 
+                                        if (file instanceof TFile) {
+                                            modelData = await plugin.readMolFile(file);
+                                            finalFmt = file.extension;
+                                            filePath = file.path;
                                         }
                                     }
                                 }
-                                await plugin.renderMolecule(div, finalFmt, modelData, true, this);
+                                await plugin.renderMolecule(div, finalFmt, modelData, true, this, filePath, ctx.sourcePath);
                             };
                             await updateRender();
                             this.registerEvent(plugin.app.workspace.on("mol3d:update", () => updateRender()));
@@ -262,8 +517,8 @@ export default class Mol3DViewerMobile extends Plugin {
                             const updateRender = async (retryCount = 0) => {
                                 const file = plugin.app.metadataCache.getFirstLinkpathDest(src, ctx.sourcePath || "");
                                 if (file) {
-                                    const data = await plugin.app.vault.read(file);
-                                    await plugin.renderMolecule(node as HTMLElement, extension, data, true, this);
+                                    const data = await plugin.readMolFile(file);
+                                    await plugin.renderMolecule(node as HTMLElement, extension, data, true, this, file.path, ctx.sourcePath);
                                 } else if (retryCount < 10) {
                                     setTimeout(() => updateRender(retryCount + 1), 300);
                                 }
@@ -294,12 +549,12 @@ export default class Mol3DViewerMobile extends Plugin {
                         const child = new (class extends MarkdownRenderChild {
                             async onload() {
                                 const updateRender = async () => {
-                                    let modelData = currentMatch[2].trim(), finalFmt = currentMatch[1];
-                                    if (modelData.startsWith("[[") && modelData.endsWith("]]")) {
+                                    let modelData: string | Uint8Array = currentMatch[2].trim(), finalFmt = currentMatch[1], filePath: string | undefined;
+                                    if (typeof modelData === "string" && modelData.startsWith("[[") && modelData.endsWith("]]")) {
                                         const file = plugin.app.metadataCache.getFirstLinkpathDest(modelData.substring(2, modelData.length-2), ctx.sourcePath || "");
-                                        if (file) { modelData = await plugin.app.vault.read(file); finalFmt = file.extension; }
+                                        if (file) { modelData = await plugin.readMolFile(file); finalFmt = file.extension; filePath = file.path; }
                                     }
-                                    await plugin.renderMolecule(span, finalFmt, modelData, false, this);
+                                    await plugin.renderMolecule(span, finalFmt, modelData, false, this, filePath, ctx.sourcePath);
                                 };
                                 await updateRender();
                                 this.registerEvent(plugin.app.workspace.on("mol3d:update", () => updateRender()));
@@ -316,16 +571,24 @@ export default class Mol3DViewerMobile extends Plugin {
         });
     }
 
-    async loadSettings() { this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()); }
-    async saveSettings() { 
-        await this.saveData(this.settings); 
-        this.applySettings(); 
-        this.app.workspace.trigger("mol3d:update");
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        // 新版新增的格式键合并进已持久化的 styles（Object.assign 浅合并会整体替换 styles）
+        this.settings.styles = Object.assign({}, DEFAULT_SETTINGS.styles, this.settings.styles);
+        // 旧版 3Dmol 风格名迁移到 Mol* 原生表示名
+        const legacy: Record<string, string> = { stick: "ball-and-stick", sphere: "spacefill", line: "line", cartoon: "cartoon" };
+        let migrated = false;
+        for (const fmt of Object.keys(this.settings.styles)) {
+            const v = this.settings.styles[fmt];
+            if (legacy[v] && legacy[v] !== v) {
+                this.settings.styles[fmt] = legacy[v];
+                migrated = true;
+            }
+        }
+        if (migrated) await this.saveData(this.settings);
     }
-
-    applySettings() {
-        const root = document.documentElement;
-        root.style.setProperty('--mol3d-block-width', this.settings.blockWidth);
-        root.style.setProperty('--mol3d-block-height', this.settings.blockHeight);
+    async saveSettings() {
+        await this.saveData(this.settings);
+        this.app.workspace.trigger("mol3d:update");
     }
 }

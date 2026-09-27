@@ -9,3 +9,42 @@
 2026-08-25 | style | 卡片化容器（圆角/阴影/主题变量边框背景兜底）+ 宽度自适应 max-width:100%，标题栏硬编码色改主题变量，ResizeObserver 通过 child.register 卸载防泄漏
 2026-08-25 | fix | 透明背景改用 backgroundAlpha:0，不再向 3Dmol 传非法颜色 'none'（消除 color not found 警告）
 2026-09-08 | feat | i18n 中英双语支持（i18next，随 Obsidian 界面语言切换，文案抽取至 i18n/locales/）
+2026-09-27 | feat | 渲染引擎从 3Dmol.js 迁移至 Mol*（molstar viewer 本地注入 + CDN 回退，css 同步注入），风格改用 Mol* 原生表示名（旧 stick/sphere 自动迁移），重渲染/卸载 dispose viewer 修复 WebGL 上下文泄漏，cif 映射 mmcif
+2026-09-27 | fix | Obsidian CSP 拦截 link 样式，molstar.css 改为读文本内联注入；styles.css 增加 .msp-plugin 尺寸兜底；viewer 创建前等待容器布局防 empty textures
+2026-09-27 | fix | 后台页签 display:none 导致 Mol* 创建报 empty textures，改用 ResizeObserver 等容器可见后再创建 viewer（10s 兜底）
+2026-09-27 | fix | transparentBackground 是 canvas3d 顶层参数（此前误置 renderer 下被静默忽略）致透明背景失效；卡片/嵌入模式隐藏 Mol* 视口按钮（view 模式保留）
+2026-09-27 | fix | empty textures 根因为容器高度 0（文件视图启动时布局未完成），等待条件加 clientHeight；透明背景关闭棋盘格透出笔记底色；禁用 g3d 扩展消除重复 symbol 警告
+2026-09-27 | style | 隐藏 Mol* VR/XR 按钮（title 属性选择器，所有模式生效）
+2026-09-27 | fix | molstar.css 给 .msp-plugin/.msp-viewport/.msp-canvas 涂浅灰白底导致透明失效，styles.css 覆盖为 transparent，背景由 wrapper 设置决定
+2026-09-27 | fix | 后台页签 10s 兜底超时仍创建 0 尺寸 viewer 致 empty textures，改为无限等待可见；视口按钮改用主题变量配色修复暗色下可视性
+2026-09-27 | fix | .msp-plugin 兜底样式 position:relative+height:100% 覆盖了 molstar 的 absolute+inset:0，flex 链下高度解析为 0 致 empty textures，改回 absolute+inset:0
+2026-09-27 | fix | 背景/透明 setProps 提前到 loadStructure 之前，消除打开时闪白；容器归零时 canvas3d.pause()、恢复时 resume()+handleResize()，根治 empty textures 并节省后台渲染开销
+2026-09-27 | fix | 包装 plugin.handleResize：容器 0 尺寸时拒绝执行，从源头阻断 canvas 被写成 0x0（pause/resume 存在竞态无法全覆盖），创建后立即修正一次尺寸
+2026-09-27 | fix | 钳制 webgl.getDrawingBufferSize 最小 8x8：Mol* passes 只钳 2x2，SSAO 高分屏降采样为 0 的上游边界 bug 由此根治，覆盖挂载竞态等一切 0 尺寸漏入路径
+2026-09-27 | fix | 防御补丁重构为独立 try/catch 且钳制最先执行：此前 origCtxResize() 对隐藏容器（layout.root 为空）抛异常被外层 catch 吞掉，导致尺寸钳制对恰好会崩溃的 viewer 从未生效
+2026-09-27 | fix | 包装 passes.updateSize 直接吞掉 Mol* 上游 SSAO 0 尺寸纹理异常（前序防御均未完全阻断时的最终保险，错过一帧 resize 无害）
+2026-09-27 | fix | onload 注册 unhandledrejection 全局抑制 Mol* 上游 empty textures 未捕获拒绝，兼作版本探针（卸载时移除监听）
+2026-09-27 | feat | 适配 Mol* 全部主流格式：新增结构 mol/sd/pdbqt/pqr/gro/ent/mcif/bcif(二进制)，轨迹 dcd/xtc/trr/nc/nctraj/lammpstrj（topology/model 关键词配对 psf/prmtop/parm7/top 或结构文件，loadTrajectory），体积图 ccp4/mrc/map/dsn6/brix/dx/dxbin/cub/cube/dscif/mtz（loadVolumeFromUrl + isovalue 关键词）；FORMAT_REGISTRY 统一映射；二进制走 readBinary；loadSettings 合并新增格式键
+2026-09-27 | fix | 代码块关键词段+[[wikilink]]组合（轨迹/体积图带参数场景）无法解析链接，renderMolecule 内统一解析关键词段后的 wikilink
+2026-09-27 | fix | 体积图与轨迹加载后手动 requestCameraReset 对焦（loadVolumeFromUrl 不自动对焦）；轨迹无 topology 关键词时按同目录同名 psf/prmtop/parm7/top/pdb/gro 自动配对
+2026-09-27 | remove | 砍掉体积/密度图支持（ccp4/mrc/map/dsn6/brix/dx/dxbin/cub/cube/dscif/mtz）：Obsidian 内渲染不稳定，移除 FORMAT_REGISTRY/默认设置/文档相应条目
+2026-09-27 | feat | 纯拓扑文件（psf/prmtop/parm7/top）注册为可打开扩展名，直接打开显示轨迹配对引导提示（i18n）；轨迹配对链路经 playwright 真实浏览器 E2E 验证（dcd+psf、nc+parm7 均 PASS）
+2026-09-27 | test | 补充真实轨迹样例 fspeptide.pdb/xtc/trr（mdtraj Fs 肽 22 原子）并 E2E 验证 xtc/trr 配对加载；移除误恢复的体积图测试文件
+2026-09-27 | fix | 轨迹格式启用 Mol* 播放/帧控制条（viewportShowAnimation/TrajectoryControls 按类别开启，CSS 放行 .mol3d-trajectory）；二进制文件视图隐藏乱码文本预览
+2026-09-27 | refactor | FORMAT_REGISTRY/TOPOLOGY_FORMATS 拆出至 formats.ts，修复 main↔view 循环引用导致 vitest 误解析 main.js 的问题
+2026-09-27 | feat | 文件视图（直接打开分子文件）改用完整 Mol* 界面（控制面板/序列/日志/左侧组件树），卡片与嵌入保持精简
+2026-09-27 | fix | 文件视图 raw 文本改为默认隐藏的覆盖式悬浮层 + 右下角 </> 按钮切换（此前与 Mol* 面板布局冲突）；完整界面关闭 Remote States 面板避免离线联网报错
+2026-09-27 | feat | 结构表示统一应用 Mol* secondary-structure 着色主题（updateRepresentationsTheme），与官方 viewer 默认一致
+2026-09-27 | fix | updateRepresentationsTheme 报 Could not find node：重建表示后组件快照引用失效，改为重新读取 hierarchy 再套二级结构着色（playwright E2E 验证通过，旧快照可复现该错）
+2026-09-27 | fix | 小分子全灰：secondary-structure 主题对非聚合物无定义，改为按表示类型分流——cartoon 二级结构着色，其余元素着色
+2026-09-27 | fix | 拓扑文件直接打开时不再创建空 viewer，原始文本铺满视图（顶部带配对引导），可视化文件的文本预览仍默认隐藏+按钮切换
+2026-09-27 | fix | 二进制与拓扑文件的视图隐藏 raw 切换按钮（无预览内容可切换）
+2026-09-27 | feat | 默认启用 Mol* Occlusion/Shadow/Outline 后期效果（官方 viewer 观感），参数沿用内置默认值
+2026-09-27 | fix | shadow/outline 从 off 状态取 params 为 {} 致 shader 崩溃（program not linked），改用官方 PD 定义的 on 默认参数（playwright E2E 验证无 GL 错误）
+2026-09-27 | chore | 清理迁移残留：删除死设置字段 inlineWidth/inlineHeight/inlineAlign 与 applySettings 死 CSS 变量、styles.css 死类 .mol3d-viewer/.mol3d-inline 及 :root 变量；设置页风格下拉按结构/轨迹分组并排除拓扑格式；API.md 同步
+2026-09-27 | feat | 设置页改版对齐 mol2d 风格：插件标题、每项设置带说明文字、风格下拉按结构/轨迹分组（排除拓扑），底部新增代码块关键词帮助表（布局/外观/轨迹三节，中英双语，主题变量表格样式）
+2026-09-27 | feat | 设置页新增渲染效果一节（对齐 Mol* Settings/Controls 面板）：Occlusion/Shadow/Outline/Dof/Fog 开关、透明混合模式（WBOIT/Blended/DPOIT）、分辨率模式、像素缩放滑杆，全部接入 canvas3d setProps 与 viewer 创建选项
+2026-09-27 | fix | 晶格不可见：重建表示时默认 preset 的晶胞被清掉，现重建后调用 builders.structure.tryCreateUnitcell 补建并默认显示（无对称信息结构自动跳过，playwright E2E 验证）
+2026-09-27 | fix | 晶格框不可见根因有二：晶体学 core CIF（仅分数坐标、CIF1 方言）被当 mmcif 解析得空模型——按内容特征回退 cifCore；晶胞表示改为翻转默认 preset 已有隐藏节点的 isHidden（tryCreateUnitcell 引用路径不可靠）；顺带修复 ext 未定义的潜伏 bug
+2026-09-27 | feat | core CIF 对称性展开：默认 preset-trajectory-unitcell 完整晶胞（截图验证 NaCl 岩盐满晶胞），cell/晶胞 关键词可切 supercell（3x3x3）/contacts（晶体接触），帮助表与 README 同步
+2026-09-27 | fix | 晶胞框误全局显示：撤回 updateCellState 翻转（蛋白 mmcif/pdb 晶胞恢复默认隐藏），core CIF 由 unitcell preset 自带可见晶胞无需额外处理

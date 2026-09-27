@@ -1,23 +1,74 @@
 {
     "settings": {
-        "sizeTitle": "Size & Alignment",
+        "title": "Mol3D Viewer Settings",
+        "sizeTitle": "Size",
         "blockWidth": "Block width",
+        "blockWidthDesc": "Default width of molecule cards in notes, e.g. 100% or 400px",
         "blockHeight": "Block height",
+        "blockHeightDesc": "Default height of molecule cards in notes, e.g. 400px",
         "borderTitle": "Border Style",
         "borderWidth": "Border width",
+        "borderWidthDesc": "Border width of molecule cards, e.g. 1px; set 0 to hide",
         "borderColor": "Border color",
+        "borderColorDesc": "Border color of molecule cards",
         "backgroundTitle": "Molecule Background",
         "transparent": "Enable transparent background",
         "transparentDesc": "When enabled, the background color setting is ignored",
         "backgroundColor": "Background color",
+        "backgroundColorDesc": "Canvas background color when transparency is disabled",
         "styleTitle": "Default Style per Format",
-        "styleCartoon": "Cartoon (spectrum)"
+        "styleStructure": "Structure Formats",
+        "styleTrajectory": "Trajectory Formats",
+        "styleCartoon": "Cartoon (spectrum)",
+        "help": {
+            "heading": "Code Block Keywords",
+            "colKeyword": "Keyword",
+            "colType": "Type",
+            "colDesc": "Description",
+            "sections": {
+                "layout": "Layout",
+                "appearance": "Appearance",
+                "trajectory": "Trajectory"
+            },
+            "rows": {
+                "width": "Card width, e.g. width: 400px or width: 80%",
+                "height": "Card height, e.g. height: 300px",
+                "title": "Show a title bar above the canvas",
+                "style": "Mol* representation: ball-and-stick / spacefill / line / cartoon / gaussian-surface",
+                "bg": "Background color; bg: transparent for transparency",
+                "bc": "Border color, e.g. bc: #4a90e2",
+                "bw": "Border width, e.g. bw: 2px",
+                "topology": "Pair a topology file for trajectory formats (dcd/xtc/trr/nc/lammpstrj), e.g. topology: [[system.psf]]",
+                "model": "Pair a structure file as trajectory topology, e.g. model: [[system.pdb]]",
+                "cell": "Unit cell mode: unit (default) / supercell (3x3x3) / contacts (crystal contacts, core CIF only)"
+            }
+        },
+        "renderingTitle": "Rendering Effects",
+        "occlusion": "Ambient Occlusion",
+        "occlusionDesc": "SSAO: deeper shading in crevices and contacts",
+        "shadow": "Shadow",
+        "shadowDesc": "Simplistic shadows",
+        "outline": "Outline",
+        "outlineDesc": "Draw object outlines",
+        "dof": "Depth of Field",
+        "dofDesc": "Blur out-of-focus regions (may slow down large systems)",
+        "fog": "Fog",
+        "fogDesc": "Fade distant objects",
+        "transparencyMode": "Transparency mode",
+        "transparencyModeDesc": "WBOIT default, DPOIT more accurate, Blended most compatible",
+        "resolutionMode": "Resolution mode",
+        "resolutionModeDesc": "Auto / Scaled / Native pixels",
+        "pixelScale": "Pixel scale",
+        "pixelScaleDesc": "Render resolution multiplier, sharper but slower (0.5-2)"
     },
     "views": {
-        "displayName": "Mol3D Viewer"
+        "displayName": "Mol3D Viewer",
+        "toggleRaw": "Show/hide raw file content"
     },
     "errors": {
-        "libNotLoaded": "3Dmol.js library not loaded. Make sure 3Dmol-min.js exists in the plugin folder",
-        "parseFailed": "Failed to parse model"
+        "libNotLoaded": "Mol* library not loaded. Make sure molstar.js exists in the plugin folder",
+        "parseFailed": "Failed to parse model",
+        "trajectoryNeedsTopology": "Trajectory file requires a topology keyword, e.g. topology: [[system.psf]]",
+        "topologyNeedsTrajectory": "Topology file: pair it with a trajectory file, e.g. a dcd/xtc code block with topology: [[this file]]"
     }
 }

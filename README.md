@@ -1,6 +1,6 @@
 Mol3D Viewer for Obsidian
 
-Mol3D Viewer 是一款专为 Obsidian 深度定制的高性能 3D 分子可视化插件。它集成并优化了高性能的 3Dmol.js 渲染引擎，旨在打破传统笔记与科学数据之间的壁垒，使用户能够直接在 Obsidian 笔记环境中对复杂的化学分子、蛋白质大分子进行流畅的渲染、交互与分析。
+Mol3D Viewer 是一款专为 Obsidian 深度定制的高性能 3D 分子可视化插件。它集成并优化了高性能的 Mol*（molstar）渲染引擎，旨在打破传统笔记与科学数据之间的壁垒，使用户能够直接在 Obsidian 笔记环境中对复杂的化学分子、蛋白质大分子进行流畅的渲染、交互与分析。
 
 无论是进行生物化学研究、日常教学演示，还是撰写学术笔记，Mol3D Viewer 都能为你提供近乎原生应用的沉浸式分子结构查看体验。
 
@@ -8,23 +8,26 @@ Mol3D Viewer 是一款专为 Obsidian 深度定制的高性能 3D 分子可视�
 
 全格式兼容性
 
-插件提供对多种化学数据格式的原生解析支持，确保了科研工作流的无缝衔接：
+插件基于 Mol* 提供对其全部主流化学数据格式的原生解析支持，确保科研工作流的无缝衔接：
 
-.xyz：通用的笛卡尔坐标格式，适用于小型分子。
+结构格式：.xyz / .pdb / .ent / .sdf / .sd / .mol / .mol2 / .cif / .mcif / .bcif（二进制）/ .pdbqt / .pqr / .gro —— 一个文件即可渲染。晶体学 core CIF（仅分数坐标）自动识别并按对称性展开为完整晶胞（显示晶胞框），代码块中可用 cell 关键词切换 supercell（3×3×3 超胞）/ contacts（晶体接触）模式。
 
-.pdb：蛋白质数据库标准格式，完整支持生物大分子的残基信息。
+轨迹格式：.dcd / .xtc / .trr / .nc / .nctraj / .lammpstrj —— 缺省时自动按同目录同名文件配对拓扑/结构文件（如 traj.xtc 依次找 traj.psf / .prmtop / .top / .pdb / .gro），也可在代码块中用 topology 关键词显式指定（.psf / .prmtop / .parm7 / .top 或结构文件），例如：
 
-.sdf / .mol2：结构数据文件，保留化学键结信息与性质描述。
+``` xtc
+topology: [[system.psf]]
+---
+[[trajectory.xtc]]
+```
 
-.cif：晶体学信息文件，支持复杂晶体结构的渲染。
 
 工业级渲染模式
 
-针对不同的科研需求，提供四种经过优化的渲染逻辑：
+针对不同的科研需求，提供多种经过优化的渲染逻辑（Mol* 原生表示）：
 
-Stick (棒状)：强调化学键的几何分布，清晰展示原子间的连接关系与键角，是研究分子构效关系的理想选择。
+Ball-and-Stick (球棍)：强调化学键的几何分布，清晰展示原子间的连接关系与键角，是研究分子构效关系的理想选择。
 
-Sphere (球状)：基于原子范德华半径的经典 CPK 填充模型，直观呈现分子的空间占位与位阻效应。
+Spacefill (空间填充)：基于原子范德华半径的经典 CPK 填充模型，直观呈现分子的空间占位与位阻效应。
 
 Line (线状)：极度精简的骨架展示，能够有效降低视觉负担，在大规模分子系统或初步筛选时提供流畅的性能表现。
 
@@ -72,7 +75,7 @@ Cartoon (卡通/光谱色)：专为结构生物学设计，通过光谱颜色梯
 
 创建一个名为 obsidian-mol3d-viewer-mobile 的新文件夹。
 
-将 main.js, manifest.json, styles.css 以及核心依赖文件 3Dmol-min.js 悉数放入该文件夹。
+将 main.js, manifest.json, styles.css 以及核心依赖文件 molstar.js 与 molstar.css 悉数放入该文件夹。
 
 在 Obsidian 插件面板中点击刷新按钮并启用。
 
@@ -143,7 +146,7 @@ Style, 风格
 
 指定渲染风格。
 
-stick, sphere, cartoon, line
+ball-and-stick, spacefill, cartoon, line, gaussian-surface（旧名 stick/sphere 仍可使用，会自动映射）
 
 背景
 
@@ -204,7 +207,7 @@ BW, bw
 
 常见问题
 
-模型无法显示？：请检查库中是否正确放置了 3Dmol-min.js。由于 3Dmol 库较大，它是作为独立文件加载的。
+模型无法显示？：请检查库中是否正确放置了 molstar.js。由于 Mol* 库较大，它是作为独立文件加载的。
 
 嵌入显示空白？：请确保文件名与双链引用的名称完全一致，且文件后缀在受支持的列表内。
 
@@ -216,7 +219,7 @@ BW, bw
 
 Mol3DViewerMobile 类：负责 Obsidian API 的挂载、设置管理及 CSS 注入。
 
-renderMolecule 函数：负责生命周期管理，包括数据拉取、3Dmol 实例初始化及 ResizeObserver 监听。
+renderMolecule 函数：负责生命周期管理，包括数据拉取、Mol* viewer 实例初始化与销毁（dispose 防 WebGL 上下文泄漏）及 ResizeObserver 监听。
 
 parseKeywords：负责从代码块源码中提取 Frontmatter 信息。
 

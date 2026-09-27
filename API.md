@@ -2,7 +2,7 @@
 
 ## 插件概述
 
-Mol3D Viewer 是一个 Obsidian 3D 分子结构查看器插件，基于 [3Dmol.js](https://3dmol.csb.pitt.edu/) 渲染分子模型。支持 `xyz`、`pdb`、`sdf`、`mol2`、`cif` 五种分子格式，提供四种使用方式：直接打开分子文件（自定义视图）、Markdown 代码块、嵌入文件 `![[file.pdb]]`、行内语法 `pdb([[file]])` 或 `pdb(...)`。
+Mol3D Viewer 是一个 Obsidian 3D 分子结构查看器插件，基于 [Mol* (molstar)](https://molstar.org/) 渲染分子模型。支持 Mol* 全部主流格式——结构：`xyz`/`pdb`/`ent`/`sdf`/`sd`/`mol`/`mol2`/`cif`/`mcif`/`bcif`/`pdbqt`/`pqr`/`gro`；轨迹（需 `topology` 关键词配对 psf/prmtop/parm7/top 或结构文件）：`dcd`/`xtc`/`trr`/`nc`/`nctraj`/`lammpstrj`，提供四种使用方式：直接打开分子文件（自定义视图）、Markdown 代码块、嵌入文件 `![[file.pdb]]`、行内语法 `pdb([[file]])` 或 `pdb(...)`。
 
 ### Manifest 信息（manifest.json）
 
@@ -32,7 +32,7 @@ Mol3D Viewer 是一个 Obsidian 3D 分子结构查看器插件，基于 [3Dmol.j
 - `onload()`：
   1. 调用 `loadSettings()` 加载设置；
   2. 注册设置页 `Mol3DMobileSettingTab`；
-  3. 通过 `injectDependency("3Dmol-min.js", "$3Dmol")` 注入 3Dmol.js（优先插件目录本地文件，失败回退 CDN `https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.0/3Dmol-min.js`），暴露为全局 `window.$3Dmol`；
+  3. 通过 `injectDependency("molstar.js", "molstar")` 注入 Mol* viewer bundle（优先插件目录本地 `molstar.js`，失败回退 CDN `https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/`；`molstar.css` 因 CSP 限制读文本内联注入），暴露为全局 `window.molstar`；
   4. 注册自定义视图 `VIEW_TYPE_MOL3D`（`"mol3d-view"`），并将 `settings.styles` 中的全部扩展名（xyz/pdb/sdf/mol2/cif）关联到该视图（`registerExtensions`），重复注册时捕获异常并跳过；
   5. 调用 `initProcessors()` 注册 Markdown 处理器；
   6. 调用 `applySettings()` 应用 CSS 变量。
@@ -49,12 +49,12 @@ Mol3D Viewer 是一个 Obsidian 3D 分子结构查看器插件，基于 [3Dmol.j
   解析代码块/内容开头以 `---` 分隔的关键词段。支持 `Key:Value`、`Key=Value`，键不区分中英文（内部统一小写），仅含键时值为 `true`。返回解析出的关键词字典和去掉关键词段后的分子数据正文。
 
 - `renderMolecule(parentContainer: HTMLElement, format: string, rawContent: string, isEmbed: boolean | string = false): Promise<any>`
-  核心渲染函数。在 `parentContainer` 内创建 `.mol3d-wrapper`（含可选标题栏 `.mol3d-title-bar` 和画布 `.mol3d-canvas-area`），调用 `$3Dmol.createViewer` 渲染模型。
+  核心渲染函数。在 `parentContainer` 内创建 `.mol3d-wrapper`（含可选标题栏 `.mol3d-title-bar` 和画布 `.mol3d-canvas-area`），调用 `molstar.Viewer.create` 后按格式类别分发：结构走 `loadStructureFromData`（`cif`/`mcif`/`bcif` 映射 `mmcif`，`sd`→`sdf`，`ent`→`pdb`），轨迹走 `loadTrajectory`（topology-data/coordinates-data，缺省 topology 时按同目录同名文件自动配对）；二进制格式经 `vault.readBinary` 读取。
   - `isEmbed === "view"`：无边框、宽高 100%（用于文件视图）；为 `true`：嵌入模式；为 `false`：行内模式。
   - 移动端（窗口宽 ≤ 600）且非 view 模式时宽度强制 `100%`。
   - 支持关键词覆盖：`width`/`height`、`bc`/`border-color`/`边框颜色`、`bw`/`border-width`/`边框宽度`、`bg`/`背景`、`title`/`标题`、`style`/`风格`。
   - 通过 `ResizeObserver` 在尺寸变化时 `viewer.resize()` 并重绘。返回 viewer 实例。
-  - 容器宽度为 0 时延迟 200ms 重试；`$3Dmol` 未加载或模型解析失败时在容器内显示错误文本。
+  - 容器宽度为 0 时延迟 200ms 重试；`molstar` 未加载或模型解析失败时在容器内显示错误文本。重渲染与卸载时 `viewer.dispose()` 释放 WebGL 上下文。
 
 - `initProcessors()`：注册以下 Markdown 处理器（格式列表取自 `settings.styles` 的键）：
   1. 每个格式一个代码块处理器（如 ```` ```pdb ````），源码含 `[[wikilink]]` 且无 `---` 时读取链接文件内容；
@@ -91,14 +91,11 @@ Mol3D Viewer 是一个 Obsidian 3D 分子结构查看器插件，基于 [3Dmol.j
 | --- | --- | --- | --- |
 | `blockWidth` | string | `"100%"` | 代码块宽度 |
 | `blockHeight` | string | `"400px"` | 代码块高度 |
-| `inlineWidth` | string | `"150px"` | 行内渲染宽度（预留，当前由 CSS 控制） |
-| `inlineHeight` | string | `"120px"` | 行内渲染高度（预留） |
-| `inlineAlign` | string | `"middle"` | 行内对齐（预留） |
 | `borderWidth` | string | `"1px"` | 边框宽度 |
 | `borderColor` | string | `"var(--background-modifier-border)"` | 边框颜色 |
 | `backgroundColor` | string | `"#000000"` | 背景颜色（关闭透明时生效） |
 | `isTransparent` | boolean | `true` | 透明背景开关 |
-| `styles` | Record<string, string> | `{ xyz: "stick", pdb: "cartoon", sdf: "sphere", mol2: "stick", cif: "line" }` | 各格式默认渲染风格，可选 `stick`/`sphere`/`line`/`cartoon` |
+| `styles` | Record<string, string> | `{ xyz: "ball-and-stick", pdb: "cartoon", sdf: "spacefill", mol2: "ball-and-stick", cif: "line" }` | 各格式默认渲染风格，可选 `ball-and-stick`/`spacefill`/`line`/`cartoon`/`gaussian-surface`（旧名 `stick`/`sphere` 自动迁移） |
 
 ### `Mol3DMobileSettingTab extends PluginSettingTab`
 
@@ -153,4 +150,4 @@ ATOM      1  N   ALA A   1      ...
 
 ## 样式类（styles.css 中定义）
 
-`.mol3d-wrapper`、`.mol3d-title-bar`、`.mol3d-canvas-area`、`.mol3d-view-container`、`.mol3d-molecule-container`、`.mol3d-text-preview`、`.mol3d-inline-container`、`.mol3d-embed-active`、`.mol3d-viewer-container-block`；CSS 变量 `--mol3d-block-width`、`--mol3d-block-height`。
+`.mol3d-wrapper`、`.mol3d-title-bar`、`.mol3d-canvas-area`、`.mol3d-view-container`、`.mol3d-molecule-container`、`.mol3d-text-preview`、`.mol3d-raw-toggle`、`.mol3d-inline-container`、`.mol3d-embed-active`、`.mol3d-viewer-container-block`、`.mol3d-trajectory`、`.mol3d-view-full`。

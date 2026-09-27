@@ -1,23 +1,74 @@
 {
     "settings": {
-        "sizeTitle": "尺寸与对齐设置",
+        "title": "Mol3D Viewer 设置",
+        "sizeTitle": "尺寸设置",
         "blockWidth": "块宽度",
+        "blockWidthDesc": "笔记中分子卡片的默认宽度，如 100% 或 400px",
         "blockHeight": "块高度",
+        "blockHeightDesc": "笔记中分子卡片的默认高度，如 400px",
         "borderTitle": "边框样式设置",
         "borderWidth": "边框宽度",
+        "borderWidthDesc": "分子卡片的边框宽度，如 1px；设为 0 可隐藏",
         "borderColor": "边框颜色",
+        "borderColorDesc": "分子卡片的边框颜色",
         "backgroundTitle": "分子背景设置",
         "transparent": "启用透明背景",
         "transparentDesc": "开启后将忽略背景颜色设置",
         "backgroundColor": "背景颜色",
+        "backgroundColorDesc": "关闭透明背景时的画布背景色",
         "styleTitle": "格式默认风格",
-        "styleCartoon": "Cartoon (光谱色)"
+        "styleStructure": "结构格式",
+        "styleTrajectory": "轨迹格式",
+        "styleCartoon": "Cartoon (光谱色)",
+        "help": {
+            "heading": "代码块关键词",
+            "colKeyword": "关键词",
+            "colType": "类型",
+            "colDesc": "说明",
+            "sections": {
+                "layout": "布局",
+                "appearance": "外观",
+                "trajectory": "轨迹"
+            },
+            "rows": {
+                "width": "卡片宽度，如 width: 400px 或 width: 80%",
+                "height": "卡片高度，如 height: 300px",
+                "title": "在画布上方显示标题栏",
+                "style": "Mol* 表示：ball-and-stick / spacefill / line / cartoon / gaussian-surface",
+                "bg": "背景颜色；bg: transparent 为透明",
+                "bc": "边框颜色，如 bc: #4a90e2",
+                "bw": "边框宽度，如 bw: 2px",
+                "topology": "轨迹格式（dcd/xtc/trr/nc/lammpstrj）配对拓扑文件，如 topology: [[system.psf]]",
+                "model": "用结构文件作为轨迹拓扑，如 model: [[system.pdb]]",
+                "cell": "晶胞显示模式：unit 完整晶胞（默认）/ supercell 3×3×3 超胞 / contacts 晶体接触（仅 core CIF 晶体文件有效）"
+            }
+        },
+        "renderingTitle": "渲染效果",
+        "occlusion": "环境光遮蔽 (Occlusion)",
+        "occlusionDesc": "增强缝隙与接触处的立体感（SSAO）",
+        "shadow": "阴影 (Shadow)",
+        "shadowDesc": "简洁投影效果",
+        "outline": "轮廓描边 (Outline)",
+        "outlineDesc": "在物体边缘绘制描边",
+        "dof": "景深 (Dof)",
+        "dofDesc": "焦点外虚化（大分子可能拖慢渲染）",
+        "fog": "雾效 (Fog)",
+        "fogDesc": "远处对象淡出",
+        "transparencyMode": "透明混合模式",
+        "transparencyModeDesc": "透明渲染算法：WBOIT 默认，DPOIT 更精确，Blended 最兼容",
+        "resolutionMode": "分辨率模式",
+        "resolutionModeDesc": "Auto 自动 / Scaled 缩放 / Native 原生像素",
+        "pixelScale": "像素缩放",
+        "pixelScaleDesc": "渲染分辨率倍率，越大越清晰越耗性能（0.5–2）"
     },
     "views": {
-        "displayName": "Mol3D Viewer"
+        "displayName": "Mol3D Viewer",
+        "toggleRaw": "显示/隐藏原始文件内容"
     },
     "errors": {
-        "libNotLoaded": "3Dmol.js 库未加载，请确保插件目录下确实存在 3Dmol-min.js 文件",
-        "parseFailed": "模型解析失败"
+        "libNotLoaded": "Mol* 库未加载，请确保插件目录下确实存在 molstar.js 文件",
+        "parseFailed": "模型解析失败",
+        "trajectoryNeedsTopology": "轨迹文件需要 topology 关键词指定拓扑/结构文件，例如 topology: [[system.psf]]",
+        "topologyNeedsTrajectory": "拓扑文件：请与轨迹文件配对使用，例如在 dcd/xtc 代码块中写 topology: [[本文件]]"
     }
 }

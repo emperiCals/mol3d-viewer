@@ -30,53 +30,183 @@ var import_obsidian3 = require("obsidian");
 // mol3d-viewer/settings.ts
 var import_obsidian = require("obsidian");
 
+// mol3d-viewer/formats.ts
+var FORMAT_REGISTRY = {
+  xyz: { mol: "xyz", category: "structure" },
+  pdb: { mol: "pdb", category: "structure" },
+  ent: { mol: "pdb", category: "structure" },
+  sdf: { mol: "sdf", category: "structure" },
+  sd: { mol: "sdf", category: "structure" },
+  mol: { mol: "mol", category: "structure" },
+  mol2: { mol: "mol2", category: "structure" },
+  cif: { mol: "mmcif", category: "structure" },
+  mcif: { mol: "mmcif", category: "structure" },
+  bcif: { mol: "mmcif", category: "structure", binary: true },
+  pdbqt: { mol: "pdbqt", category: "structure" },
+  pqr: { mol: "pqr", category: "structure" },
+  gro: { mol: "gro", category: "structure" },
+  dcd: { mol: "dcd", category: "trajectory", binary: true },
+  xtc: { mol: "xtc", category: "trajectory", binary: true },
+  trr: { mol: "trr", category: "trajectory", binary: true },
+  nc: { mol: "nctraj", category: "trajectory", binary: true },
+  nctraj: { mol: "nctraj", category: "trajectory", binary: true },
+  lammpstrj: { mol: "lammpstrj", category: "trajectory" },
+  psf: { mol: "psf", category: "topology" },
+  prmtop: { mol: "prmtop", category: "topology" },
+  parm7: { mol: "prmtop", category: "topology" },
+  top: { mol: "top", category: "topology" }
+};
+var TOPOLOGY_FORMATS = { psf: "psf", prmtop: "prmtop", parm7: "prmtop", top: "top" };
+
 // mol3d-viewer/i18n/locales/en.json
 var en_default = {
   settings: {
-    sizeTitle: "Size & Alignment",
+    title: "Mol3D Viewer Settings",
+    sizeTitle: "Size",
     blockWidth: "Block width",
+    blockWidthDesc: "Default width of molecule cards in notes, e.g. 100% or 400px",
     blockHeight: "Block height",
+    blockHeightDesc: "Default height of molecule cards in notes, e.g. 400px",
     borderTitle: "Border Style",
     borderWidth: "Border width",
+    borderWidthDesc: "Border width of molecule cards, e.g. 1px; set 0 to hide",
     borderColor: "Border color",
+    borderColorDesc: "Border color of molecule cards",
     backgroundTitle: "Molecule Background",
     transparent: "Enable transparent background",
     transparentDesc: "When enabled, the background color setting is ignored",
     backgroundColor: "Background color",
+    backgroundColorDesc: "Canvas background color when transparency is disabled",
     styleTitle: "Default Style per Format",
-    styleCartoon: "Cartoon (spectrum)"
+    styleStructure: "Structure Formats",
+    styleTrajectory: "Trajectory Formats",
+    styleCartoon: "Cartoon (spectrum)",
+    help: {
+      heading: "Code Block Keywords",
+      colKeyword: "Keyword",
+      colType: "Type",
+      colDesc: "Description",
+      sections: {
+        layout: "Layout",
+        appearance: "Appearance",
+        trajectory: "Trajectory"
+      },
+      rows: {
+        width: "Card width, e.g. width: 400px or width: 80%",
+        height: "Card height, e.g. height: 300px",
+        title: "Show a title bar above the canvas",
+        style: "Mol* representation: ball-and-stick / spacefill / line / cartoon / gaussian-surface",
+        bg: "Background color; bg: transparent for transparency",
+        bc: "Border color, e.g. bc: #4a90e2",
+        bw: "Border width, e.g. bw: 2px",
+        topology: "Pair a topology file for trajectory formats (dcd/xtc/trr/nc/lammpstrj), e.g. topology: [[system.psf]]",
+        model: "Pair a structure file as trajectory topology, e.g. model: [[system.pdb]]",
+        cell: "Unit cell mode: unit (default) / supercell (3x3x3) / contacts (crystal contacts, core CIF only)"
+      }
+    },
+    renderingTitle: "Rendering Effects",
+    occlusion: "Ambient Occlusion",
+    occlusionDesc: "SSAO: deeper shading in crevices and contacts",
+    shadow: "Shadow",
+    shadowDesc: "Simplistic shadows",
+    outline: "Outline",
+    outlineDesc: "Draw object outlines",
+    dof: "Depth of Field",
+    dofDesc: "Blur out-of-focus regions (may slow down large systems)",
+    fog: "Fog",
+    fogDesc: "Fade distant objects",
+    transparencyMode: "Transparency mode",
+    transparencyModeDesc: "WBOIT default, DPOIT more accurate, Blended most compatible",
+    resolutionMode: "Resolution mode",
+    resolutionModeDesc: "Auto / Scaled / Native pixels",
+    pixelScale: "Pixel scale",
+    pixelScaleDesc: "Render resolution multiplier, sharper but slower (0.5-2)"
   },
   views: {
-    displayName: "Mol3D Viewer"
+    displayName: "Mol3D Viewer",
+    toggleRaw: "Show/hide raw file content"
   },
   errors: {
-    libNotLoaded: "3Dmol.js library not loaded. Make sure 3Dmol-min.js exists in the plugin folder",
-    parseFailed: "Failed to parse model"
+    libNotLoaded: "Mol* library not loaded. Make sure molstar.js exists in the plugin folder",
+    parseFailed: "Failed to parse model",
+    trajectoryNeedsTopology: "Trajectory file requires a topology keyword, e.g. topology: [[system.psf]]",
+    topologyNeedsTrajectory: "Topology file: pair it with a trajectory file, e.g. a dcd/xtc code block with topology: [[this file]]"
   }
 };
 
 // mol3d-viewer/i18n/locales/zh.json
 var zh_default = {
   settings: {
-    sizeTitle: "\u5C3A\u5BF8\u4E0E\u5BF9\u9F50\u8BBE\u7F6E",
+    title: "Mol3D Viewer \u8BBE\u7F6E",
+    sizeTitle: "\u5C3A\u5BF8\u8BBE\u7F6E",
     blockWidth: "\u5757\u5BBD\u5EA6",
+    blockWidthDesc: "\u7B14\u8BB0\u4E2D\u5206\u5B50\u5361\u7247\u7684\u9ED8\u8BA4\u5BBD\u5EA6\uFF0C\u5982 100% \u6216 400px",
     blockHeight: "\u5757\u9AD8\u5EA6",
+    blockHeightDesc: "\u7B14\u8BB0\u4E2D\u5206\u5B50\u5361\u7247\u7684\u9ED8\u8BA4\u9AD8\u5EA6\uFF0C\u5982 400px",
     borderTitle: "\u8FB9\u6846\u6837\u5F0F\u8BBE\u7F6E",
     borderWidth: "\u8FB9\u6846\u5BBD\u5EA6",
+    borderWidthDesc: "\u5206\u5B50\u5361\u7247\u7684\u8FB9\u6846\u5BBD\u5EA6\uFF0C\u5982 1px\uFF1B\u8BBE\u4E3A 0 \u53EF\u9690\u85CF",
     borderColor: "\u8FB9\u6846\u989C\u8272",
+    borderColorDesc: "\u5206\u5B50\u5361\u7247\u7684\u8FB9\u6846\u989C\u8272",
     backgroundTitle: "\u5206\u5B50\u80CC\u666F\u8BBE\u7F6E",
     transparent: "\u542F\u7528\u900F\u660E\u80CC\u666F",
     transparentDesc: "\u5F00\u542F\u540E\u5C06\u5FFD\u7565\u80CC\u666F\u989C\u8272\u8BBE\u7F6E",
     backgroundColor: "\u80CC\u666F\u989C\u8272",
+    backgroundColorDesc: "\u5173\u95ED\u900F\u660E\u80CC\u666F\u65F6\u7684\u753B\u5E03\u80CC\u666F\u8272",
     styleTitle: "\u683C\u5F0F\u9ED8\u8BA4\u98CE\u683C",
-    styleCartoon: "Cartoon (\u5149\u8C31\u8272)"
+    styleStructure: "\u7ED3\u6784\u683C\u5F0F",
+    styleTrajectory: "\u8F68\u8FF9\u683C\u5F0F",
+    styleCartoon: "Cartoon (\u5149\u8C31\u8272)",
+    help: {
+      heading: "\u4EE3\u7801\u5757\u5173\u952E\u8BCD",
+      colKeyword: "\u5173\u952E\u8BCD",
+      colType: "\u7C7B\u578B",
+      colDesc: "\u8BF4\u660E",
+      sections: {
+        layout: "\u5E03\u5C40",
+        appearance: "\u5916\u89C2",
+        trajectory: "\u8F68\u8FF9"
+      },
+      rows: {
+        width: "\u5361\u7247\u5BBD\u5EA6\uFF0C\u5982 width: 400px \u6216 width: 80%",
+        height: "\u5361\u7247\u9AD8\u5EA6\uFF0C\u5982 height: 300px",
+        title: "\u5728\u753B\u5E03\u4E0A\u65B9\u663E\u793A\u6807\u9898\u680F",
+        style: "Mol* \u8868\u793A\uFF1Aball-and-stick / spacefill / line / cartoon / gaussian-surface",
+        bg: "\u80CC\u666F\u989C\u8272\uFF1Bbg: transparent \u4E3A\u900F\u660E",
+        bc: "\u8FB9\u6846\u989C\u8272\uFF0C\u5982 bc: #4a90e2",
+        bw: "\u8FB9\u6846\u5BBD\u5EA6\uFF0C\u5982 bw: 2px",
+        topology: "\u8F68\u8FF9\u683C\u5F0F\uFF08dcd/xtc/trr/nc/lammpstrj\uFF09\u914D\u5BF9\u62D3\u6251\u6587\u4EF6\uFF0C\u5982 topology: [[system.psf]]",
+        model: "\u7528\u7ED3\u6784\u6587\u4EF6\u4F5C\u4E3A\u8F68\u8FF9\u62D3\u6251\uFF0C\u5982 model: [[system.pdb]]",
+        cell: "\u6676\u80DE\u663E\u793A\u6A21\u5F0F\uFF1Aunit \u5B8C\u6574\u6676\u80DE\uFF08\u9ED8\u8BA4\uFF09/ supercell 3\xD73\xD73 \u8D85\u80DE / contacts \u6676\u4F53\u63A5\u89E6\uFF08\u4EC5 core CIF \u6676\u4F53\u6587\u4EF6\u6709\u6548\uFF09"
+      }
+    },
+    renderingTitle: "\u6E32\u67D3\u6548\u679C",
+    occlusion: "\u73AF\u5883\u5149\u906E\u853D (Occlusion)",
+    occlusionDesc: "\u589E\u5F3A\u7F1D\u9699\u4E0E\u63A5\u89E6\u5904\u7684\u7ACB\u4F53\u611F\uFF08SSAO\uFF09",
+    shadow: "\u9634\u5F71 (Shadow)",
+    shadowDesc: "\u7B80\u6D01\u6295\u5F71\u6548\u679C",
+    outline: "\u8F6E\u5ED3\u63CF\u8FB9 (Outline)",
+    outlineDesc: "\u5728\u7269\u4F53\u8FB9\u7F18\u7ED8\u5236\u63CF\u8FB9",
+    dof: "\u666F\u6DF1 (Dof)",
+    dofDesc: "\u7126\u70B9\u5916\u865A\u5316\uFF08\u5927\u5206\u5B50\u53EF\u80FD\u62D6\u6162\u6E32\u67D3\uFF09",
+    fog: "\u96FE\u6548 (Fog)",
+    fogDesc: "\u8FDC\u5904\u5BF9\u8C61\u6DE1\u51FA",
+    transparencyMode: "\u900F\u660E\u6DF7\u5408\u6A21\u5F0F",
+    transparencyModeDesc: "\u900F\u660E\u6E32\u67D3\u7B97\u6CD5\uFF1AWBOIT \u9ED8\u8BA4\uFF0CDPOIT \u66F4\u7CBE\u786E\uFF0CBlended \u6700\u517C\u5BB9",
+    resolutionMode: "\u5206\u8FA8\u7387\u6A21\u5F0F",
+    resolutionModeDesc: "Auto \u81EA\u52A8 / Scaled \u7F29\u653E / Native \u539F\u751F\u50CF\u7D20",
+    pixelScale: "\u50CF\u7D20\u7F29\u653E",
+    pixelScaleDesc: "\u6E32\u67D3\u5206\u8FA8\u7387\u500D\u7387\uFF0C\u8D8A\u5927\u8D8A\u6E05\u6670\u8D8A\u8017\u6027\u80FD\uFF080.5\u20132\uFF09"
   },
   views: {
-    displayName: "Mol3D Viewer"
+    displayName: "Mol3D Viewer",
+    toggleRaw: "\u663E\u793A/\u9690\u85CF\u539F\u59CB\u6587\u4EF6\u5185\u5BB9"
   },
   errors: {
-    libNotLoaded: "3Dmol.js \u5E93\u672A\u52A0\u8F7D\uFF0C\u8BF7\u786E\u4FDD\u63D2\u4EF6\u76EE\u5F55\u4E0B\u786E\u5B9E\u5B58\u5728 3Dmol-min.js \u6587\u4EF6",
-    parseFailed: "\u6A21\u578B\u89E3\u6790\u5931\u8D25"
+    libNotLoaded: "Mol* \u5E93\u672A\u52A0\u8F7D\uFF0C\u8BF7\u786E\u4FDD\u63D2\u4EF6\u76EE\u5F55\u4E0B\u786E\u5B9E\u5B58\u5728 molstar.js \u6587\u4EF6",
+    parseFailed: "\u6A21\u578B\u89E3\u6790\u5931\u8D25",
+    trajectoryNeedsTopology: "\u8F68\u8FF9\u6587\u4EF6\u9700\u8981 topology \u5173\u952E\u8BCD\u6307\u5B9A\u62D3\u6251/\u7ED3\u6784\u6587\u4EF6\uFF0C\u4F8B\u5982 topology: [[system.psf]]",
+    topologyNeedsTrajectory: "\u62D3\u6251\u6587\u4EF6\uFF1A\u8BF7\u4E0E\u8F68\u8FF9\u6587\u4EF6\u914D\u5BF9\u4F7F\u7528\uFF0C\u4F8B\u5982\u5728 dcd/xtc \u4EE3\u7801\u5757\u4E2D\u5199 topology: [[\u672C\u6587\u4EF6]]"
   }
 };
 
@@ -2594,14 +2724,46 @@ function t2(key, options) {
 var DEFAULT_SETTINGS = {
   blockWidth: "100%",
   blockHeight: "400px",
-  inlineWidth: "150px",
-  inlineHeight: "120px",
-  inlineAlign: "middle",
   borderWidth: "1px",
   borderColor: "var(--background-modifier-border)",
   backgroundColor: "#000000",
   isTransparent: true,
-  styles: { xyz: "stick", pdb: "cartoon", sdf: "sphere", mol2: "stick", cif: "line" }
+  occlusion: true,
+  shadow: true,
+  outline: true,
+  dof: false,
+  fog: false,
+  transparencyMode: "wboit",
+  resolutionMode: "auto",
+  pixelScale: 1,
+  styles: {
+    // 独立结构格式
+    xyz: "ball-and-stick",
+    pdb: "cartoon",
+    ent: "cartoon",
+    sdf: "spacefill",
+    sd: "spacefill",
+    mol: "ball-and-stick",
+    mol2: "ball-and-stick",
+    cif: "line",
+    mcif: "line",
+    bcif: "cartoon",
+    pdbqt: "ball-and-stick",
+    pqr: "ball-and-stick",
+    gro: "line",
+    // 轨迹格式（需 topology/model 关键词配对或同目录同名文件自动配对）
+    dcd: "line",
+    xtc: "line",
+    trr: "line",
+    nc: "line",
+    nctraj: "line",
+    lammpstrj: "line",
+    // 纯拓扑文件（仅作轨迹配对，直接打开显示引导提示，风格占位）
+    psf: "line",
+    prmtop: "line",
+    parm7: "line",
+    top: "line"
+  }
 };
 var Mol3DMobileSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -2611,33 +2773,34 @@ var Mol3DMobileSettingTab = class extends import_obsidian.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: t2("settings.sizeTitle") });
-    new import_obsidian.Setting(containerEl).setName(t2("settings.blockWidth")).addText(
+    containerEl.createEl("h2", { text: t2("settings.title") });
+    containerEl.createEl("h3", { text: t2("settings.sizeTitle") });
+    new import_obsidian.Setting(containerEl).setName(t2("settings.blockWidth")).setDesc(t2("settings.blockWidthDesc")).addText(
       (t3) => t3.setValue(this.plugin.settings.blockWidth).onChange(async (v) => {
         this.plugin.settings.blockWidth = v;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName(t2("settings.blockHeight")).addText(
+    new import_obsidian.Setting(containerEl).setName(t2("settings.blockHeight")).setDesc(t2("settings.blockHeightDesc")).addText(
       (t3) => t3.setValue(this.plugin.settings.blockHeight).onChange(async (v) => {
         this.plugin.settings.blockHeight = v;
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h2", { text: t2("settings.borderTitle") });
-    new import_obsidian.Setting(containerEl).setName(t2("settings.borderWidth")).addText(
+    containerEl.createEl("h3", { text: t2("settings.borderTitle") });
+    new import_obsidian.Setting(containerEl).setName(t2("settings.borderWidth")).setDesc(t2("settings.borderWidthDesc")).addText(
       (t3) => t3.setValue(this.plugin.settings.borderWidth).onChange(async (v) => {
         this.plugin.settings.borderWidth = v;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName(t2("settings.borderColor")).addColorPicker(
+    new import_obsidian.Setting(containerEl).setName(t2("settings.borderColor")).setDesc(t2("settings.borderColorDesc")).addColorPicker(
       (cp) => cp.setValue(this.plugin.settings.borderColor.startsWith("var") ? "#cccccc" : this.plugin.settings.borderColor).onChange(async (v) => {
         this.plugin.settings.borderColor = v;
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h2", { text: t2("settings.backgroundTitle") });
+    containerEl.createEl("h3", { text: t2("settings.backgroundTitle") });
     new import_obsidian.Setting(containerEl).setName(t2("settings.transparent")).setDesc(t2("settings.transparentDesc")).addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.isTransparent).onChange(async (v) => {
         this.plugin.settings.isTransparent = v;
@@ -2646,23 +2809,119 @@ var Mol3DMobileSettingTab = class extends import_obsidian.PluginSettingTab {
       })
     );
     if (!this.plugin.settings.isTransparent) {
-      new import_obsidian.Setting(containerEl).setName(t2("settings.backgroundColor")).addColorPicker(
+      new import_obsidian.Setting(containerEl).setName(t2("settings.backgroundColor")).setDesc(t2("settings.backgroundColorDesc")).addColorPicker(
         (cp) => cp.setValue(this.plugin.settings.backgroundColor).onChange(async (v) => {
           this.plugin.settings.backgroundColor = v;
           await this.plugin.saveSettings();
         })
       );
     }
-    containerEl.createEl("h2", { text: t2("settings.styleTitle") });
-    const styleOptions = { "stick": "Stick", "sphere": "Sphere", "line": "Line", "cartoon": t2("settings.styleCartoon") };
-    Object.keys(this.plugin.settings.styles).forEach((fmt) => {
-      new import_obsidian.Setting(containerEl).setName(fmt.toUpperCase()).addDropdown(
-        (drop) => drop.addOptions(styleOptions).setValue(this.plugin.settings.styles[fmt]).onChange(async (v) => {
-          this.plugin.settings.styles[fmt] = v;
+    containerEl.createEl("h3", { text: t2("settings.renderingTitle") });
+    const effectToggles = [
+      ["occlusion", "settings.occlusion", "settings.occlusionDesc"],
+      ["shadow", "settings.shadow", "settings.shadowDesc"],
+      ["outline", "settings.outline", "settings.outlineDesc"],
+      ["dof", "settings.dof", "settings.dofDesc"],
+      ["fog", "settings.fog", "settings.fogDesc"]
+    ];
+    for (const [field, nameKey, descKey] of effectToggles) {
+      new import_obsidian.Setting(containerEl).setName(t2(nameKey)).setDesc(t2(descKey)).addToggle(
+        (toggle) => toggle.setValue(!!this.plugin.settings[field]).onChange(async (v) => {
+          this.plugin.settings[field] = v;
           await this.plugin.saveSettings();
         })
       );
-    });
+    }
+    new import_obsidian.Setting(containerEl).setName(t2("settings.transparencyMode")).setDesc(t2("settings.transparencyModeDesc")).addDropdown(
+      (d) => d.addOptions({ wboit: "WBOIT", blended: "Blended", dpoit: "DPOIT" }).setValue(this.plugin.settings.transparencyMode).onChange(async (v) => {
+        this.plugin.settings.transparencyMode = v;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName(t2("settings.resolutionMode")).setDesc(t2("settings.resolutionModeDesc")).addDropdown(
+      (d) => d.addOptions({ auto: "Auto", scaled: "Scaled", native: "Native" }).setValue(this.plugin.settings.resolutionMode).onChange(async (v) => {
+        this.plugin.settings.resolutionMode = v;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName(t2("settings.pixelScale")).setDesc(t2("settings.pixelScaleDesc")).addSlider(
+      (s) => s.setLimits(0.5, 2, 0.05).setValue(this.plugin.settings.pixelScale).setDynamicTooltip().onChange(async (v) => {
+        this.plugin.settings.pixelScale = v;
+        await this.plugin.saveSettings();
+      })
+    );
+    containerEl.createEl("h3", { text: t2("settings.styleTitle") });
+    const styleOptions = {
+      "ball-and-stick": "Ball and Stick",
+      "spacefill": "Spacefill",
+      "line": "Line",
+      "cartoon": t2("settings.styleCartoon"),
+      "gaussian-surface": "Gaussian Surface"
+    };
+    const groups = [
+      ["structure", t2("settings.styleStructure")],
+      ["trajectory", t2("settings.styleTrajectory")]
+    ];
+    for (const [category, title] of groups) {
+      const fmts = Object.keys(this.plugin.settings.styles).filter((f) => {
+        var _a;
+        return ((_a = FORMAT_REGISTRY[f]) == null ? void 0 : _a.category) === category;
+      });
+      if (fmts.length === 0)
+        continue;
+      containerEl.createEl("h3", { text: title });
+      fmts.forEach((fmt) => {
+        new import_obsidian.Setting(containerEl).setName(fmt.toUpperCase()).addDropdown(
+          (drop) => drop.addOptions(styleOptions).setValue(this.plugin.settings.styles[fmt]).onChange(async (v) => {
+            this.plugin.settings.styles[fmt] = v;
+            await this.plugin.saveSettings();
+          })
+        );
+      });
+    }
+    containerEl.createEl("h3", { text: t2("settings.help.heading"), style: "margin-top: 30px;" });
+    const helpDiv = containerEl.createDiv({ cls: "mol3d-settings-help" });
+    const sections = [
+      { key: "settings.help.sections.layout", rows: [
+        ["width", "css", "settings.help.rows.width"],
+        ["height", "css", "settings.help.rows.height"],
+        ["title / \u6807\u9898", "string", "settings.help.rows.title"]
+      ] },
+      { key: "settings.help.sections.appearance", rows: [
+        ["style / \u98CE\u683C", "enum", "settings.help.rows.style"],
+        ["bg / \u80CC\u666F", "color", "settings.help.rows.bg"],
+        ["bc / \u8FB9\u6846\u989C\u8272", "color", "settings.help.rows.bc"],
+        ["bw / \u8FB9\u6846\u5BBD\u5EA6", "css", "settings.help.rows.bw"],
+        ["cell / \u6676\u80DE", "enum", "settings.help.rows.cell"]
+      ] },
+      { key: "settings.help.sections.trajectory", rows: [
+        ["topology / \u62D3\u6251", "wikilink", "settings.help.rows.topology"],
+        ["model / \u7ED3\u6784", "wikilink", "settings.help.rows.model"]
+      ] }
+    ];
+    let tableHtml = `
+        <table class="mol3d-help-table">
+            <thead>
+                <tr>
+                    <th>${t2("settings.help.colKeyword")}</th>
+                    <th>${t2("settings.help.colType")}</th>
+                    <th>${t2("settings.help.colDesc")}</th>
+                </tr>
+            </thead>
+            <tbody>`;
+    for (const section of sections) {
+      tableHtml += `
+                <tr class="section-header"><td colspan="3">${t2(section.key)}</td></tr>`;
+      for (const [keyword, type, rowKey] of section.rows) {
+        tableHtml += `
+                <tr><td>${keyword}</td><td>${type}</td><td>${t2(rowKey)}</td></tr>`;
+      }
+    }
+    tableHtml += `
+            </tbody>
+        </table>
+        `;
+    helpDiv.innerHTML = tableHtml;
   }
 };
 
@@ -2688,13 +2947,34 @@ var Mol3DView = class extends import_obsidian2.TextFileView {
     this.viewContainer = this.contentEl.createDiv({ cls: "mol3d-view-container" });
     this.moleculeEl = this.viewContainer.createDiv({ cls: "mol3d-molecule-container" });
     this.textPreviewEl = this.viewContainer.createDiv({ cls: "mol3d-text-preview" });
+    this.textPreviewEl.style.display = "none";
+    const toggleBtn = this.viewContainer.createDiv({ cls: "mol3d-raw-toggle" });
+    toggleBtn.setText("</>");
+    toggleBtn.title = t2("views.toggleRaw");
+    toggleBtn.addEventListener("click", () => {
+      const el = this.textPreviewEl;
+      el.style.display = el.style.display === "none" ? "block" : "none";
+    });
+    this.rawToggleEl = toggleBtn;
   }
   setViewData(data, clear) {
+    var _a, _b;
     this.data = data;
-    if (this.file) {
-      this.plugin.renderMolecule(this.moleculeEl, this.file.extension, data, "view", this);
+    const ext = (_b = (_a = this.file) == null ? void 0 : _a.extension.toLowerCase()) != null ? _b : "";
+    const info = FORMAT_REGISTRY[ext];
+    const isBinary = !!(info == null ? void 0 : info.binary);
+    const isTopology = (info == null ? void 0 : info.category) === "topology";
+    this.moleculeEl.style.display = isTopology ? "none" : "";
+    this.textPreviewEl.classList.toggle("mol3d-text-full", isTopology);
+    this.textPreviewEl.style.display = isTopology ? "block" : isBinary ? "none" : this.textPreviewEl.style.display;
+    this.rawToggleEl.style.display = isBinary || isTopology ? "none" : "";
+    this.textPreviewEl.setText(isTopology ? t2("errors.topologyNeedsTrajectory") + "\n\n" + data : isBinary ? "" : data);
+    if (this.file && !isTopology) {
+      const file = this.file;
+      this.plugin.readMolFile(file).then(
+        (d) => this.plugin.renderMolecule(this.moleculeEl, file.extension, d, "view", this, file.path)
+      );
     }
-    this.textPreviewEl.setText(data);
   }
   getViewData() {
     return this.data;
@@ -2707,12 +2987,25 @@ var Mol3DView = class extends import_obsidian2.TextFileView {
 
 // mol3d-viewer/main.ts
 var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
+  constructor() {
+    super(...arguments);
+    // 记录每个容器上的 Mol* viewer，重渲染/卸载时 dispose，防止 WebGL 上下文泄漏
+    this.viewers = /* @__PURE__ */ new WeakMap();
+  }
   async onload() {
     await initI18n();
     await this.loadSettings();
     this.addSettingTab(new Mol3DMobileSettingTab(this.app, this));
+    const rejHandler = (e) => {
+      if (e.reason && e.reason.message === "empty textures are not allowed") {
+        console.warn("[Mol3D] \u5DF2\u6291\u5236\u4E0A\u6E38 empty textures \u5F02\u5E38\uFF080 \u5C3A\u5BF8 resize\uFF0C\u65E0\u5BB3\uFF09");
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("unhandledrejection", rejHandler);
+    this.register(() => window.removeEventListener("unhandledrejection", rejHandler));
     try {
-      await this.injectDependency("3Dmol-min.js", "$3Dmol");
+      await this.injectDependency("molstar.js", "molstar");
       try {
         this.registerView(
           VIEW_TYPE_MOL3D,
@@ -2730,26 +3023,41 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
         }
       });
       this.initProcessors();
-      this.applySettings();
       console.log("Mol3D Viewer: \u5DF2\u5F00\u542F\u6587\u4EF6\u5173\u8054\u4E0E\u589E\u5F3A\u5D4C\u5165\u6E32\u67D3");
     } catch (e) {
       console.error("Mol3D Viewer \u52A0\u8F7D\u5931\u8D25", e);
     }
   }
   async injectDependency(fileName, globalVar) {
+    if (window[globalVar])
+      return window[globalVar];
+    const injectCssText = (css) => {
+      const style = document.createElement("style");
+      style.setAttribute("data-mol3d", "molstar");
+      style.textContent = css;
+      document.head.appendChild(style);
+    };
+    const injectLocalCss = async () => {
+      try {
+        const css = await this.app.vault.adapter.read((0, import_obsidian3.normalizePath)(this.manifest.dir + "/molstar.css"));
+        injectCssText(css);
+      } catch (e) {
+      }
+    };
     return new Promise((resolve) => {
-      if (window[globalVar])
-        return resolve(window[globalVar]);
       const loadCDN = () => {
-        console.log(`[Mol3D] \u5C1D\u8BD5\u4ECE CDN \u56DE\u9000\u52A0\u8F7D 3Dmol-min.js ...`);
+        console.log(`[Mol3D] \u5C1D\u8BD5\u4ECE CDN \u56DE\u9000\u52A0\u8F7D molstar.js ...`);
+        fetch("https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.css").then((r) => r.text()).then(injectCssText).catch(() => {
+        });
         const script = document.createElement("script");
-        script.src = "https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.0/3Dmol-min.js";
+        script.src = "https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.js";
         script.type = "text/javascript";
         script.onload = () => resolve(window[globalVar]);
         script.onerror = () => resolve(null);
         document.head.appendChild(script);
       };
       try {
+        injectLocalCss();
         const adapter = this.app.vault.adapter;
         const resourcePath = adapter.getResourcePath((0, import_obsidian3.normalizePath)(this.manifest.dir + "/" + fileName));
         const script = document.createElement("script");
@@ -2762,6 +3070,13 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
         loadCDN();
       }
     });
+  }
+  // 按格式读取分子文件：二进制格式（bcif/dcd/xtc/体积图等）走 readBinary
+  async readMolFile(file) {
+    const info = FORMAT_REGISTRY[file.extension.toLowerCase()];
+    if (info == null ? void 0 : info.binary)
+      return new Uint8Array(await this.app.vault.readBinary(file));
+    return this.app.vault.read(file);
   }
   // 解析关键词功能：支持 Key:Value, Key=Value 以及中英文
   parseKeywords(content) {
@@ -2783,19 +3098,36 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
     }
     return { keywords, finalContent };
   }
-  // 核心渲染函数
-  async renderMolecule(parentContainer, format, rawContent, isEmbed = false, child) {
+  // 核心渲染函数（filePath：体积图按 URL 加载所需；sourcePath：轨迹 topology 链接解析基准）
+  async renderMolecule(parentContainer, format, rawContent, isEmbed = false, child, filePath, sourcePath) {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     if (parentContainer.clientWidth === 0) {
-      setTimeout(() => this.renderMolecule(parentContainer, format, rawContent, isEmbed), 200);
+      setTimeout(() => this.renderMolecule(parentContainer, format, rawContent, isEmbed, child, filePath, sourcePath), 200);
       return;
     }
     parentContainer.empty();
-    if (!window.$3Dmol) {
+    this.disposeViewer(parentContainer);
+    if (!window.molstar) {
       parentContainer.setText(t2("errors.libNotLoaded"));
       return;
     }
-    const { keywords, finalContent } = this.parseKeywords(rawContent);
+    const parsed = typeof rawContent === "string" ? this.parseKeywords(rawContent) : { keywords: {}, finalContent: rawContent };
+    const keywords = parsed.keywords;
+    let finalContent = parsed.finalContent;
+    let effExt = format.toLowerCase();
+    let effPath = filePath;
+    if (typeof finalContent === "string" && /^\[\[.+\]\]$/.test(finalContent.trim())) {
+      const ref = finalContent.trim().slice(2, -2);
+      const f = this.app.metadataCache.getFirstLinkpathDest(ref, sourcePath || "");
+      if (f instanceof import_obsidian3.TFile) {
+        finalContent = await this.readMolFile(f);
+        effExt = f.extension.toLowerCase();
+        effPath = f.path;
+      }
+    }
     const wrapper = parentContainer.createDiv({ cls: "mol3d-wrapper" });
+    if (((_a = FORMAT_REGISTRY[effExt]) == null ? void 0 : _a.category) === "trajectory")
+      wrapper.addClass("mol3d-trajectory");
     const isMobileScreen = window.innerWidth <= 600;
     let finalWidth = keywords.width || this.settings.blockWidth;
     let finalHeight = keywords.height || this.settings.blockHeight;
@@ -2805,6 +3137,7 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
     let finalBorderColor = keywords.bc || keywords["border-color"] || keywords.\u8FB9\u6846\u989C\u8272 || this.settings.borderColor;
     let finalBorderWidth = keywords.bw || keywords["border-width"] || keywords.\u8FB9\u6846\u5BBD\u5EA6 || this.settings.borderWidth;
     if (isEmbed === "view") {
+      wrapper.addClass("mol3d-view-full");
       wrapper.style.border = "none";
       wrapper.style.borderRadius = "0";
       wrapper.style.height = "100%";
@@ -2830,34 +3163,188 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
       titleBar.setText(titleText);
     }
     const canvasArea = wrapper.createDiv({ cls: "mol3d-canvas-area" });
-    const viewer = window.$3Dmol.createViewer(canvasArea, renderTransparent ? { backgroundColor: "#ffffff", backgroundAlpha: 0 } : { backgroundColor: renderBg });
-    let userStyle = keywords.style || keywords.\u98CE\u683C || this.settings.styles[format.toLowerCase()] || "stick";
-    let styleObj = {};
-    if (userStyle === "cartoon") {
-      styleObj = { cartoon: { color: "spectrum" } };
-    } else {
-      styleObj[userStyle] = {};
+    if (canvasArea.clientWidth === 0 || canvasArea.clientHeight === 0) {
+      await new Promise((resolve) => {
+        const sro = new ResizeObserver(() => {
+          if (canvasArea.clientWidth > 0 && canvasArea.clientHeight > 0) {
+            sro.disconnect();
+            resolve();
+          }
+        });
+        sro.observe(canvasArea);
+      });
     }
+    let viewer;
     try {
-      viewer.addModel(finalContent, format.toLowerCase());
-      viewer.setStyle({}, styleObj);
-      viewer.zoomTo();
-      const bgColorHex = renderBg.startsWith("#") ? renderBg.replace("#", "0x") : renderBg;
-      const opacity = renderTransparent ? 0 : 1;
-      try {
-        const colorVal = parseInt(bgColorHex.startsWith("0x") ? bgColorHex : bgColorHex.startsWith("#") ? bgColorHex.replace("#", "0x") : "0x000000");
-        viewer.setBackgroundColor(isNaN(colorVal) ? 0 : colorVal, opacity);
-      } catch (e) {
-        viewer.setBackgroundColor(0, opacity);
+      const isTrajectory = ((_b = FORMAT_REGISTRY[effExt]) == null ? void 0 : _b.category) === "trajectory";
+      const perfOpts = {
+        pixelScale: this.settings.pixelScale,
+        resolutionMode: this.settings.resolutionMode
+      };
+      const viewerOptions = isEmbed === "view" ? {
+        viewportBackgroundColor: renderTransparent ? void 0 : renderBg,
+        layoutShowRemoteState: false,
+        // 远程状态面板会联网拉取 webchem.ncbr.muni.cz，离线报错
+        disabledExtensions: ["g3d"],
+        // 避免多实例重复注册 g3d symbol 刷警告
+        ...perfOpts
+      } : {
+        layoutIsExpanded: false,
+        layoutShowControls: false,
+        layoutShowSequence: false,
+        layoutShowLog: false,
+        layoutShowLeftPanel: false,
+        viewportShowExpand: false,
+        viewportShowControls: false,
+        viewportShowSettings: false,
+        viewportShowScreenshotControls: false,
+        viewportShowSelectionMode: false,
+        // 轨迹格式需要播放/帧控制条
+        viewportShowAnimation: isTrajectory,
+        viewportShowTrajectoryControls: isTrajectory,
+        viewportBackgroundColor: renderTransparent ? void 0 : renderBg,
+        disabledExtensions: ["g3d"],
+        ...perfOpts
+      };
+      viewer = await window.molstar.Viewer.create(canvasArea, viewerOptions);
+      this.viewers.set(parentContainer, viewer);
+      if (child) {
+        child.register(() => this.disposeViewer(parentContainer));
       }
-      viewer.render();
+      try {
+        const webgl = (_c = viewer.plugin.canvas3d) == null ? void 0 : _c.webgl;
+        if (webgl && !webgl.__mol3dSizeClamped) {
+          const origGetSize = webgl.getDrawingBufferSize.bind(webgl);
+          webgl.getDrawingBufferSize = () => {
+            const s = origGetSize();
+            if (s.width >= 8 && s.height >= 8)
+              return s;
+            return { width: Math.max(s.width, 8), height: Math.max(s.height, 8) };
+          };
+          webgl.__mol3dSizeClamped = true;
+          console.debug("[Mol3D] drawing buffer size clamp applied");
+        } else if (!webgl) {
+          console.warn("[Mol3D] canvas3d.webgl \u4E0D\u53EF\u7528\uFF0C\u5C3A\u5BF8\u94B3\u5236\u672A\u751F\u6548");
+        }
+      } catch (e) {
+      }
+      try {
+        const passes = (_d = viewer.plugin.canvas3dContext) == null ? void 0 : _d.passes;
+        if (passes && !passes.__mol3dGuarded) {
+          const origUpdateSize = passes.updateSize.bind(passes);
+          passes.updateSize = () => {
+            try {
+              origUpdateSize();
+            } catch (e) {
+              console.debug("[Mol3D] updateSize \u5F02\u5E38\u5DF2\u541E\u6389\uFF08\u5BB9\u5668\u5C3A\u5BF8\u4E3A 0 \u65F6\u7684\u4E0A\u6E38 bug\uFF09", e);
+            }
+          };
+          passes.__mol3dGuarded = true;
+        }
+      } catch (e) {
+      }
+      try {
+        const hex = renderBg.trim().replace(/^#/, "");
+        const colorNum = /^[0-9a-fA-F]{6}$/.test(hex) ? parseInt(hex, 16) : 0;
+        const c3d = viewer.plugin.canvas3d;
+        const s = this.settings;
+        c3d == null ? void 0 : c3d.setProps({
+          transparentBackground: renderTransparent,
+          checkeredTransparentBackground: false,
+          // 透明时透出笔记底色，而非棋盘格
+          renderer: { backgroundColor: colorNum },
+          // 渲染效果开关（参数为 Mol* 官方默认值；off 状态 params 为 {}，沿用会缺字段崩 shader）
+          postprocessing: {
+            occlusion: { name: s.occlusion ? "on" : "off", params: { samples: 32, multiScale: { name: "off", params: {} }, radius: 5, bias: 0.8, blurKernelSize: 15, blurDepthBias: 0.5, resolutionScale: 1, color: 0, transparentThreshold: 0.4 } },
+            shadow: { name: s.shadow ? "on" : "off", params: { steps: 1, maxDistance: 3, tolerance: 1 } },
+            outline: { name: s.outline ? "on" : "off", params: { scale: 1, threshold: 0.33, color: 0, includeTransparent: true } },
+            dof: { name: s.dof ? "on" : "off", params: { blurSize: 9, blurSpread: 1, inFocus: 0, PPM: 20, center: "camera-target", mode: "plane" } }
+          },
+          cameraFog: { name: s.fog ? "on" : "off", params: { intensity: 15 } },
+          transparency: s.transparencyMode
+        });
+      } catch (e) {
+      }
+      try {
+        const origCtxResize = (_e = viewer.plugin.handleResize) == null ? void 0 : _e.bind(viewer.plugin);
+        if (origCtxResize) {
+          viewer.plugin.handleResize = () => {
+            if (canvasArea.clientWidth > 0 && canvasArea.clientHeight > 0)
+              origCtxResize();
+          };
+          if (canvasArea.clientWidth > 0 && canvasArea.clientHeight > 0)
+            origCtxResize();
+        }
+      } catch (e) {
+      }
+    } catch (e) {
+      canvasArea.setText(t2("errors.libNotLoaded"));
+      return;
+    }
+    const legacyStyle = { stick: "ball-and-stick", sphere: "spacefill" };
+    let userStyle = keywords.style || keywords.\u98CE\u683C || this.settings.styles[effExt] || "ball-and-stick";
+    userStyle = legacyStyle[userStyle] || userStyle;
+    const info = FORMAT_REGISTRY[effExt];
+    try {
+      if ((info == null ? void 0 : info.category) === "topology") {
+        canvasArea.setText(t2("errors.topologyNeedsTrajectory"));
+      } else if ((info == null ? void 0 : info.category) === "trajectory") {
+        const topoRef = keywords.topology || keywords.\u62D3\u6251 || keywords.model || keywords.\u7ED3\u6784;
+        let topoFile = null;
+        if (topoRef) {
+          const ref = String(topoRef).replace(/^\[\[|\]\]$/g, "");
+          topoFile = this.app.metadataCache.getFirstLinkpathDest(ref, sourcePath || "");
+        } else if (filePath) {
+          const base = filePath.replace(/\.[^.]+$/, "");
+          for (const e of ["psf", "prmtop", "parm7", "top", "pdb", "gro"]) {
+            const f = this.app.vault.getAbstractFileByPath(`${base}.${e}`);
+            if (f instanceof import_obsidian3.TFile) {
+              topoFile = f;
+              break;
+            }
+          }
+        }
+        if (!(topoFile instanceof import_obsidian3.TFile)) {
+          canvasArea.setText(t2("errors.trajectoryNeedsTopology"));
+        } else {
+          const topoExt = topoFile.extension.toLowerCase();
+          const topoData = await this.readMolFile(topoFile);
+          const model = TOPOLOGY_FORMATS[topoExt] ? { kind: "topology-data", data: topoData, format: TOPOLOGY_FORMATS[topoExt] } : { kind: "model-data", data: topoData, format: ((_f = FORMAT_REGISTRY[topoExt]) == null ? void 0 : _f.mol) || topoExt };
+          await viewer.loadTrajectory({
+            model,
+            coordinates: { kind: "coordinates-data", data: finalContent, format: info.mol }
+          });
+          await this.applyRepresentation(viewer, userStyle);
+          try {
+            (_h = (_g = viewer.plugin.canvas3d) == null ? void 0 : _g.requestCameraReset) == null ? void 0 : _h.call(_g);
+          } catch (e) {
+          }
+        }
+      } else {
+        let molFormat = (info == null ? void 0 : info.mol) || effExt;
+        const isCoreCif = molFormat === "mmcif" && typeof finalContent === "string" && /_atom_site_fract_/.test(finalContent) && !/_atom_site\.label_atom_id/.test(finalContent);
+        if (isCoreCif) {
+          const cellMode = (keywords.cell || keywords.\u6676\u80DE || "unit").toString().toLowerCase();
+          const presetId = cellMode === "supercell" ? "preset-trajectory-supercell" : cellMode === "contacts" ? "preset-trajectory-crystal-contacts" : "preset-trajectory-unitcell";
+          const data = await viewer.plugin.builders.data.rawData({ data: finalContent });
+          const trajectory = await viewer.plugin.builders.structure.parseTrajectory(data, "cifCore");
+          await viewer.plugin.builders.structure.hierarchy.applyPreset(trajectory, presetId);
+        } else {
+          await viewer.loadStructureFromData(finalContent, molFormat);
+        }
+        await this.applyRepresentation(viewer, userStyle);
+      }
     } catch (err) {
       canvasArea.setText(t2("errors.parseFailed"));
     }
     const ro = new ResizeObserver(() => {
-      if (wrapper.clientWidth > 0) {
-        viewer.resize();
-        viewer.render();
+      var _a2;
+      const c3d = (_a2 = viewer.plugin) == null ? void 0 : _a2.canvas3d;
+      if (wrapper.clientWidth > 0 && wrapper.clientHeight > 0) {
+        c3d == null ? void 0 : c3d.resume();
+        viewer.handleResize();
+      } else {
+        c3d == null ? void 0 : c3d.pause();
       }
     });
     ro.observe(wrapper);
@@ -2865,6 +3352,46 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
       child.register(() => ro.disconnect());
     }
     return viewer;
+  }
+  disposeViewer(container) {
+    const v = this.viewers.get(container);
+    if (v) {
+      try {
+        v.dispose();
+      } catch (e) {
+      }
+      this.viewers.delete(container);
+    }
+  }
+  // 按 Mol* 原生表示名重建结构表示，统一使用二级结构着色
+  async applyRepresentation(viewer, style) {
+    var _a, _b, _c, _d, _e;
+    const mgr = (_b = (_a = viewer.plugin) == null ? void 0 : _a.managers) == null ? void 0 : _b.structure;
+    if (!mgr)
+      return;
+    const structures = mgr.hierarchy.current.structures;
+    for (const s of structures) {
+      const comps = s.components;
+      if (!comps || comps.length === 0)
+        continue;
+      try {
+        await mgr.component.removeRepresentations(comps);
+        await mgr.component.addRepresentation(comps, style);
+        const fresh = mgr.hierarchy.current.structures;
+        for (const fs of fresh) {
+          if ((_c = fs.components) == null ? void 0 : _c.length) {
+            await ((_e = (_d = mgr.component).updateRepresentationsTheme) == null ? void 0 : _e.call(_d, fs.components, (_c2, repr) => {
+              var _a2, _b2, _c3, _d2;
+              return {
+                color: ((_d2 = (_c3 = (_b2 = (_a2 = repr.cell) == null ? void 0 : _a2.transform) == null ? void 0 : _b2.params) == null ? void 0 : _c3.type) == null ? void 0 : _d2.name) === "cartoon" ? "secondary-structure" : "element-symbol"
+              };
+            }));
+          }
+        }
+      } catch (e) {
+        console.warn(`[Mol3D] \u65E0\u6CD5\u5E94\u7528\u8868\u793A\u98CE\u683C ${style}`, e);
+      }
+    }
   }
   initProcessors() {
     const formats = Object.keys(this.settings.styles);
@@ -2876,18 +3403,19 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
           const child = new class extends import_obsidian3.MarkdownRenderChild {
             async onload() {
               const updateRender = async () => {
-                let modelData = source.trim(), finalFmt = fmt;
-                if (modelData.includes("[[") && modelData.includes("]]") && !modelData.includes("---")) {
+                let modelData = source.trim(), finalFmt = fmt, filePath;
+                if (typeof modelData === "string" && modelData.includes("[[") && modelData.includes("]]") && !modelData.includes("---")) {
                   const match = modelData.match(/\[\[(.*?)\]\]/);
                   if (match) {
                     const file = plugin.app.metadataCache.getFirstLinkpathDest(match[1], ctx.sourcePath || "");
                     if (file instanceof import_obsidian3.TFile) {
-                      modelData = await plugin.app.vault.read(file);
+                      modelData = await plugin.readMolFile(file);
                       finalFmt = file.extension;
+                      filePath = file.path;
                     }
                   }
                 }
-                await plugin.renderMolecule(div, finalFmt, modelData, true, this);
+                await plugin.renderMolecule(div, finalFmt, modelData, true, this, filePath, ctx.sourcePath);
               };
               await updateRender();
               this.registerEvent(plugin.app.workspace.on("mol3d:update", () => updateRender()));
@@ -2914,8 +3442,8 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
               const updateRender = async (retryCount = 0) => {
                 const file = plugin.app.metadataCache.getFirstLinkpathDest(src, ctx.sourcePath || "");
                 if (file) {
-                  const data = await plugin.app.vault.read(file);
-                  await plugin.renderMolecule(node, extension, data, true, this);
+                  const data = await plugin.readMolFile(file);
+                  await plugin.renderMolecule(node, extension, data, true, this, file.path, ctx.sourcePath);
                 } else if (retryCount < 10) {
                   setTimeout(() => updateRender(retryCount + 1), 300);
                 }
@@ -2946,15 +3474,16 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
             const child = new class extends import_obsidian3.MarkdownRenderChild {
               async onload() {
                 const updateRender = async () => {
-                  let modelData = currentMatch[2].trim(), finalFmt = currentMatch[1];
-                  if (modelData.startsWith("[[") && modelData.endsWith("]]")) {
+                  let modelData = currentMatch[2].trim(), finalFmt = currentMatch[1], filePath;
+                  if (typeof modelData === "string" && modelData.startsWith("[[") && modelData.endsWith("]]")) {
                     const file = plugin.app.metadataCache.getFirstLinkpathDest(modelData.substring(2, modelData.length - 2), ctx.sourcePath || "");
                     if (file) {
-                      modelData = await plugin.app.vault.read(file);
+                      modelData = await plugin.readMolFile(file);
                       finalFmt = file.extension;
+                      filePath = file.path;
                     }
                   }
-                  await plugin.renderMolecule(span, finalFmt, modelData, false, this);
+                  await plugin.renderMolecule(span, finalFmt, modelData, false, this, filePath, ctx.sourcePath);
                 };
                 await updateRender();
                 this.registerEvent(plugin.app.workspace.on("mol3d:update", () => updateRender()));
@@ -2972,15 +3501,21 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.settings.styles = Object.assign({}, DEFAULT_SETTINGS.styles, this.settings.styles);
+    const legacy = { stick: "ball-and-stick", sphere: "spacefill", line: "line", cartoon: "cartoon" };
+    let migrated = false;
+    for (const fmt of Object.keys(this.settings.styles)) {
+      const v = this.settings.styles[fmt];
+      if (legacy[v] && legacy[v] !== v) {
+        this.settings.styles[fmt] = legacy[v];
+        migrated = true;
+      }
+    }
+    if (migrated)
+      await this.saveData(this.settings);
   }
   async saveSettings() {
     await this.saveData(this.settings);
-    this.applySettings();
     this.app.workspace.trigger("mol3d:update");
-  }
-  applySettings() {
-    const root = document.documentElement;
-    root.style.setProperty("--mol3d-block-width", this.settings.blockWidth);
-    root.style.setProperty("--mol3d-block-height", this.settings.blockHeight);
   }
 };
