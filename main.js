@@ -2972,8 +2972,10 @@ var Mol3DView = class extends import_obsidian2.TextFileView {
     if (this.file && !isTopology) {
       const file = this.file;
       this.plugin.readMolFile(file).then((d) => this.plugin.renderMolecule(this.moleculeEl, file.extension, d, "view", this, file.path)).catch((e) => {
+        var _a2;
         console.error("[Mol3D] \u6587\u4EF6\u52A0\u8F7D\u5931\u8D25", e);
-        this.moleculeEl.setText(t2("errors.parseFailed") + ": " + ((e == null ? void 0 : e.message) || e));
+        const detail = e ? [e.name, e.message, (_a2 = (e.stack || "").split("\n")[1]) == null ? void 0 : _a2.trim()].filter(Boolean).join(" | ") : "unknown";
+        this.moleculeEl.setText(t2("errors.parseFailed") + ": " + detail);
       });
     }
   }

@@ -71,7 +71,8 @@ export class Mol3DView extends TextFileView {
                 .then(d => this.plugin.renderMolecule(this.moleculeEl, file.extension, d, "view", this, file.path))
                 .catch(e => {
                     console.error("[Mol3D] 文件加载失败", e);
-                    this.moleculeEl.setText(t("errors.parseFailed") + ": " + (e?.message || e));
+                    const detail = e ? [e.name, e.message, (e.stack || "").split("\n")[1]?.trim()].filter(Boolean).join(" | ") : "unknown";
+                    this.moleculeEl.setText(t("errors.parseFailed") + ": " + detail);
                 });
         }
     }
