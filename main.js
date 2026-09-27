@@ -3183,8 +3183,15 @@ var Mol3DViewerMobile = class extends import_obsidian3.Plugin {
       };
       const viewerOptions = isEmbed === "view" ? {
         viewportBackgroundColor: renderTransparent ? void 0 : renderBg,
+        layoutIsExpanded: false,
+        // expanded 布局为全窗口应用设计，移动端会溢出容器与 Obsidian 栏重叠
+        // reactive 默认会在窄屏把面板堆叠到容器外，按宽度固定布局方向
+        layoutControlsDisplay: canvasArea.clientWidth >= 700 ? "landscape" : "portrait",
         layoutShowRemoteState: false,
         // 远程状态面板会联网拉取 webchem.ncbr.muni.cz，离线报错
+        viewportShowExpand: false,
+        // 展开/全屏按钮无实际用途
+        viewportShowToggleFullscreen: false,
         disabledExtensions: ["g3d"],
         // 避免多实例重复注册 g3d symbol 刷警告
         ...perfOpts

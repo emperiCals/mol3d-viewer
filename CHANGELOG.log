@@ -48,3 +48,4 @@
 2026-09-27 | fix | 晶格框不可见根因有二：晶体学 core CIF（仅分数坐标、CIF1 方言）被当 mmcif 解析得空模型——按内容特征回退 cifCore；晶胞表示改为翻转默认 preset 已有隐藏节点的 isHidden（tryCreateUnitcell 引用路径不可靠）；顺带修复 ext 未定义的潜伏 bug
 2026-09-27 | feat | core CIF 对称性展开：默认 preset-trajectory-unitcell 完整晶胞（截图验证 NaCl 岩盐满晶胞），cell/晶胞 关键词可切 supercell（3x3x3）/contacts（晶体接触），帮助表与 README 同步
 2026-09-27 | fix | 晶胞框误全局显示：撤回 updateCellState 翻转（蛋白 mmcif/pdb 晶胞恢复默认隐藏），core CIF 由 unitcell preset 自带可见晶胞无需额外处理
+2026-09-27 | fix | iPad 进入视图标签栏/状态栏重叠：view 模式默认 layoutIsExpanded:true 触发 position:fixed 全窗口布局，改为 false 且 layoutControlsDisplay 按宽度 landscape/portrait；禁用展开/全屏按钮（viewportShowExpand/ToggleFullscreen + CSS title 兜底）

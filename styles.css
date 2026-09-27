@@ -73,10 +73,12 @@
 .mol3d-wrapper:not(.mol3d-view-full) .msp-semi-transparent-overlay {
     display: none !important;
 }
-/* VR/XR 按钮（HeadsetVRSvg，title 为 Enter/Exit XR）无实际用途，所有模式隐藏 */
+/* VR/XR 按钮（HeadsetVRSvg，title 为 Enter/Exit XR）与展开/全屏按钮无实际用途，所有模式隐藏 */
 .mol3d-wrapper .msp-btn[title="Enter XR"],
 .mol3d-wrapper .msp-btn[title="Exit XR"],
-.mol3d-wrapper .msp-btn[title^="Augmented/Virtual Reality"] {
+.mol3d-wrapper .msp-btn[title^="Augmented/Virtual Reality"],
+.mol3d-wrapper .msp-btn[title="Toggle Expanded Viewport"],
+.mol3d-wrapper .msp-btn[title="Toggle Full Screen"] {
     display: none !important;
 }
 /* Mol* 视口按钮默认浅灰配色（#f3f2ee），在暗色/透明背景下可视性差，适配 Obsidian 主题变量 */
